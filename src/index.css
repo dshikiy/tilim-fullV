@@ -1,0 +1,15 @@
+@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Montserrat:wght@400;500;600;700;800;900&display=swap');
+
+@theme {
+  --color-tilim-blue: #102B45;
+  --color-tilim-yellow: #EAB308;
+  /* Шрифттерді Tailwind-ке ресми түрде тіркеу */
+  --font-sans: "Inter", sans-serif;
+  --font-montserrat: "Montserrat", sans-serif;
+}
+
+body {
+  background-color: white;
+  color: #102B45;
+}
