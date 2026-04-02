@@ -416,5 +416,32 @@ func main() {
 		c.JSON(http.StatusOK, gin.H{"message": "Құпия сөз сәтті ауыстырылды!"})
 	})
 
+	// ==========================================================
+	// ЖАСАНДЫ ИНТЕЛЛЕКТ ЧАТЫ (AI TUTOR)
+	// ==========================================================
+	type ChatMessage struct {
+		Message string `json:"message"`
+	}
+
+	r.POST("/api/chat", func(c *gin.Context) {
+		var input ChatMessage
+		if err := c.ShouldBindJSON(&input); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Қате сұрау"})
+			return
+		}
+
+		// Әзірге UI/UX тексеру үшін қарапайым алгоритм (Кейін ChatGPT/Gemini API қосамыз)
+		userMsg := input.Message
+		var reply string
+
+		if len(userMsg) < 2 {
+			reply = "Сәлем! Мен TILIM-нің жасанды интеллектісімін. Қазақ тілі грамматикасы бойынша қандай сұрағыңыз бар?"
+		} else {
+			reply = "Керемет сұрақ! Сіз: «" + userMsg + "» деп сұрадыңыз. Қазақ тілінде бұл ережені былай түсіндіруге болады: [Осы жерде нақты ИИ жауабы болады]. Тағы не білгіңіз келеді?"
+		}
+
+		c.JSON(http.StatusOK, gin.H{"reply": reply})
+	})
+
 	r.Run(":8080")
 }

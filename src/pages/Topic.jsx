@@ -11,24 +11,25 @@ const getEmbedUrl = (url) => {
 
 const Topic = () => {
   const { gradeId, topicId, lessonId } = useParams();
-  const navigate = useNavigate(); // Басқа бетке лақтыру үшін керек
+  const navigate = useNavigate(); 
   
   const [lessonData, setLessonData] = useState(null);
   const [gameState, setGameState] = useState('start');
   const [currentIdx, setCurrentIdx] = useState(0);
   const [score, setScore] = useState(0);
+  const [scoreSaved, setScoreSaved] = useState(false); // Ұпайдың сақталғанын білу үшін
+
+  const userEmail = localStorage.getItem('userEmail'); // Оқушының поштасы керек
 
   // 1. ЛОГИН ТЕКСЕРУ ЖӘНЕ МӘЛІМЕТТЕРДІ ЖҮКТЕУ
   useEffect(() => {
-    // Егер оқушы жүйеге кірмеген болса, оны Логин бетіне қуып жібереміз
     const isLoggedIn = localStorage.getItem('isLoggedIn');
     if (isLoggedIn !== 'true') {
       alert("Бұл сабақты көру үшін жүйеге кіруіңіз керек!");
       navigate('/login');
-      return; // Код әрі қарай оқылмайды
+      return; 
     }
 
-    // Егер кірген болса, сабақты базадан тартамыз
     fetch(`http://localhost:8080/api/grades/${gradeId}`)
       .then(res => res.ok ? res.json() : null)
       .then(data => {
@@ -43,6 +44,25 @@ const Topic = () => {
       })
       .catch(err => setLessonData({ error: true, message: "Сервермен байланыс жоқ." }));
   }, [gradeId, topicId, lessonId, navigate]);
+
+  // =====================================================================
+  // 2. ЖАҢА ФУНКЦИЯ: ҰПАЙДЫ БЭКЕНДКЕ ЖІБЕРУ (ТЕСТ БІТКЕНДЕ)
+  // =====================================================================
+  useEffect(() => {
+    if (gameState === 'result' && score > 0 && !scoreSaved && userEmail) {
+      // Бэкендке ұпайды сақтау туралы сұрау жібереміз
+      fetch('http://localhost:8080/api/add-score', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: userEmail, score: score })
+      })
+      .then(res => {
+        if(res.ok) setScoreSaved(true); // Қайта-қайта қоса бермеуі үшін
+      })
+      .catch(err => console.error("Ұпай сақталмады:", err));
+    }
+  }, [gameState, score, scoreSaved, userEmail]);
+
 
   if (lessonData === null) return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center text-2xl font-black text-[#102B45] animate-pulse">
@@ -59,11 +79,18 @@ const Topic = () => {
   );
 
   const quizzes = lessonData.quizzes || [];
+  
+  // ТЕСТТІ БАСҚАРУ
   const handleAnswer = (isCorrect) => {
     if (isCorrect) setScore(score + 10);
+    
+    // Жауап берген соң, келесі сұраққа өту
     setTimeout(() => {
-      if (currentIdx + 1 < quizzes.length) setCurrentIdx(currentIdx + 1);
-      else setGameState('result');
+      if (currentIdx + 1 < quizzes.length) {
+          setCurrentIdx(currentIdx + 1);
+      } else {
+          setGameState('result'); // Тест бітті
+      }
     }, 600);
   };
 
@@ -75,9 +102,11 @@ const Topic = () => {
         <div className="container mx-auto px-6 flex justify-between items-center">
           <Link to="/"><img src="/logo.png" alt="Tilim" className="h-8 md:h-10 hover:scale-105 transition" /></Link>
           <div className="flex gap-4 items-center">
-             <span className="font-bold text-sm text-[#102B45]"><i className="fa-solid fa-user-check text-emerald-500 mr-2"></i> Оқушы</span>
-             <Link to={`/grades/${gradeId}/${topicId}`} className="text-xs font-bold text-gray-400 uppercase tracking-widest hover:text-[#102B45] transition flex items-center gap-2">
-               Артқа қайту <i className="fa-solid fa-arrow-right"></i>
+             <Link to="/profile" className="font-bold text-sm text-[#102B45] hover:text-emerald-600 transition">
+                 <i className="fa-solid fa-user-check text-emerald-500 mr-2"></i> Профиль
+             </Link>
+             <Link to={`/grades/${gradeId}/${topicId}`} className="text-xs font-bold text-gray-400 uppercase tracking-widest hover:text-[#102B45] transition flex items-center gap-2 border-l border-gray-200 pl-4">
+               Артқа <i className="fa-solid fa-arrow-right"></i>
              </Link>
           </div>
         </div>
@@ -88,7 +117,9 @@ const Topic = () => {
         {/* НАВИГАЦИЯ ЖӘНЕ ТАҚЫРЫП */}
         <div className="mb-10">
             <div className="text-[10px] md:text-xs font-bold text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                <span>{gradeId}-СЫНЫП</span> <span>›</span> <span>{topicId.replace('-', ' ')}</span> <span>›</span> <span className="text-[#102B45]">САБАҚ ДАЙЫНДАЛУДА 🛠</span>
+                <Link to={`/grades/${gradeId}`} className="hover:text-emerald-500">{gradeId}-СЫНЫП</Link> 
+                <span>›</span> 
+                <Link to={`/grades/${gradeId}/${topicId}`} className="hover:text-emerald-500">{lessonData.title}</Link> 
             </div>
             <h1 className="text-3xl md:text-5xl font-black uppercase border-l-8 border-yellow-500 pl-4 text-[#102B45] leading-tight">
                 {lessonData.title}
@@ -187,9 +218,17 @@ const Topic = () => {
                         <div className="animate-in zoom-in duration-500 py-8 relative z-10">
                             <h3 className="text-4xl font-black mb-2 uppercase">Керемет!</h3>
                             <p className="text-purple-200 font-bold uppercase tracking-widest mb-6">Сенің нәтижең</p>
-                            <div className="text-6xl font-black text-yellow-400 mb-10">
+                            <div className="text-6xl font-black text-yellow-400 mb-6">
                                 {score} <span className="text-2xl text-white/50">/ {quizzes.length * 10}</span>
                             </div>
+                            
+                            {/* Бэкендке сақталғанын білдіретін жазу */}
+                            {scoreSaved && (
+                                <div className="text-emerald-400 font-bold text-sm mb-10 flex items-center justify-center gap-2">
+                                    <i className="fa-solid fa-check-circle"></i> Ұпай профиліңізге сақталды!
+                                </div>
+                            )}
+
                             <button onClick={() => window.location.reload()} className="bg-white text-purple-900 px-8 py-3 rounded-xl font-black hover:scale-105 transition shadow-lg uppercase tracking-widest text-sm">
                                 Қайта ойнау
                             </button>
