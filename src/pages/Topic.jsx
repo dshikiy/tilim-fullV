@@ -1,205 +1,207 @@
-import React, { useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
-import { allGradesData } from '../data'; // Мәліметтерді импорттау
+import React, { useState, useEffect } from 'react';
+import { useParams, Link, useNavigate } from 'react-router-dom';
+
+// YouTube сілтемесін дұрыстайтын функция
+const getEmbedUrl = (url) => {
+  if (!url) return '';
+  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+  const match = url.match(regExp);
+  return (match && match[2].length === 11) ? `https://www.youtube.com/embed/${match[2]}` : url;
+};
 
 const Topic = () => {
-  // 1. URL-ден қай сынып, қай бөлім және қай сабақ екенін оқып алу
   const { gradeId, topicId, lessonId } = useParams();
-
-  // 2. Деректер базасынан нақты осы сабақты іздеу
-  const currentGrade = allGradesData[gradeId] || {};
-  const currentTopicName = currentGrade.lessons?.[topicId]?.title || "Бөлім";
+  const navigate = useNavigate(); // Басқа бетке лақтыру үшін керек
   
-  // Егер сабақ базада табылмаса (әлі жазылмаса), қатып қалмас үшін "Дайындалуда" дегенді шығарамыз
-  const currentContent = currentGrade.content?.[lessonId] || {
-    title: "Сабақ дайындалуда 🛠",
-    theory: "Бұл сабаққа ереже мен видео әлі қосылмаған. Жобаны дамыту барысында міндетті түрде қосылады!",
-    videoLocked: true,
-    quiz: [
-      {
-        question: "Бұл сабақтың тесті дайын емес. Артқа қайтыңыз.",
-        answers: [
-          { text: "Жарайды", correct: true },
-          { text: "Түсіндім", correct: false }
-        ]
-      }
-    ]
-  };
-
-  const quizData = currentContent.quiz;
-
-  // 3. Ойынның күйін (state) басқару
-  const [gameState, setGameState] = useState('start'); // start, playing, result
+  const [lessonData, setLessonData] = useState(null);
+  const [gameState, setGameState] = useState('start');
   const [currentIdx, setCurrentIdx] = useState(0);
   const [score, setScore] = useState(0);
-  const [selectedAnswer, setSelectedAnswer] = useState(null);
 
-  const handleStart = () => setGameState('playing');
+  // 1. ЛОГИН ТЕКСЕРУ ЖӘНЕ МӘЛІМЕТТЕРДІ ЖҮКТЕУ
+  useEffect(() => {
+    // Егер оқушы жүйеге кірмеген болса, оны Логин бетіне қуып жібереміз
+    const isLoggedIn = localStorage.getItem('isLoggedIn');
+    if (isLoggedIn !== 'true') {
+      alert("Бұл сабақты көру үшін жүйеге кіруіңіз керек!");
+      navigate('/login');
+      return; // Код әрі қарай оқылмайды
+    }
 
-  const handleAnswer = (answer) => {
-    if (selectedAnswer) return;
-    setSelectedAnswer(answer);
-    if (answer.correct) setScore(score + 10);
+    // Егер кірген болса, сабақты базадан тартамыз
+    fetch(`http://localhost:8080/api/grades/${gradeId}`)
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data && data.topics) {
+          const topic = data.topics.find(t => t.slug === topicId);
+          const lesson = topic?.lessons?.find(l => l.slug === lessonId);
+          if (lesson) setLessonData(lesson);
+          else setLessonData({ error: true, message: "Бұл сабақ табылмады." });
+        } else {
+          setLessonData({ error: true, message: "Бөлімдер жоқ." });
+        }
+      })
+      .catch(err => setLessonData({ error: true, message: "Сервермен байланыс жоқ." }));
+  }, [gradeId, topicId, lessonId, navigate]);
 
+  if (lessonData === null) return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center text-2xl font-black text-[#102B45] animate-pulse">
+        Жүктелуде... ⏳
+    </div>
+  );
+
+  if (lessonData.error) return (
+    <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center">
+      <h1 className="text-3xl font-black text-red-500 mb-4">Қате ⚠️</h1>
+      <p className="font-bold text-gray-600 mb-8">{lessonData.message}</p>
+      <Link to={`/grades/${gradeId}/${topicId}`} className="bg-[#102B45] text-white px-8 py-3 rounded-xl font-bold hover:scale-105 transition">← Бөлімге қайту</Link>
+    </div>
+  );
+
+  const quizzes = lessonData.quizzes || [];
+  const handleAnswer = (isCorrect) => {
+    if (isCorrect) setScore(score + 10);
     setTimeout(() => {
-      if (currentIdx + 1 < quizData.length) {
-        setCurrentIdx(currentIdx + 1);
-        setSelectedAnswer(null);
-      } else {
-        setGameState('result');
-      }
-    }, 1500);
+      if (currentIdx + 1 < quizzes.length) setCurrentIdx(currentIdx + 1);
+      else setGameState('result');
+    }, 600);
   };
 
   return (
-    <div className="bg-gray-50 flex flex-col min-h-screen font-sans text-[#102B45] antialiased">
+    <div className="min-h-screen bg-[#F8F9FB] flex flex-col font-['Inter'] text-[#102B45]">
       
       {/* HEADER */}
-      <header className="bg-[#102B45] text-white">
-        <div className="container mx-auto px-6 py-4 flex justify-between items-center">
-            <Link to="/" className="text-2xl font-bold flex items-center gap-2 font-['Montserrat']">
-                <span className="text-yellow-500">⚜️</span> TILIM
-            </Link>
-            {/* Артқа қайту батырмасы енді дәл сол бөлімге қайтарады */}
-            <Link to={`/grades/${gradeId}/${topicId}`} className="text-sm hover:text-yellow-400 transition font-medium tracking-tight">
-                ← Артқа қайту
-            </Link>
+      <header className="bg-white border-b border-gray-100 py-4 shadow-sm sticky top-0 z-50">
+        <div className="container mx-auto px-6 flex justify-between items-center">
+          <Link to="/"><img src="/logo.png" alt="Tilim" className="h-8 md:h-10 hover:scale-105 transition" /></Link>
+          <div className="flex gap-4 items-center">
+             <span className="font-bold text-sm text-[#102B45]"><i className="fa-solid fa-user-check text-emerald-500 mr-2"></i> Оқушы</span>
+             <Link to={`/grades/${gradeId}/${topicId}`} className="text-xs font-bold text-gray-400 uppercase tracking-widest hover:text-[#102B45] transition flex items-center gap-2">
+               Артқа қайту <i className="fa-solid fa-arrow-right"></i>
+             </Link>
+          </div>
         </div>
       </header>
 
-      <main className="flex-grow container mx-auto px-6 py-8 max-w-4xl">
+      <main className="container mx-auto px-4 md:px-6 py-8 md:py-12 max-w-4xl flex-grow">
         
-        {/* Breadcrumbs (Навигациялық тізбек) */}
-        <nav className="text-xs text-gray-400 mb-6 font-medium uppercase tracking-widest">
-            {gradeId}-сынып  <i className="fa-solid fa-chevron-right mx-2 text-[8px]"></i> 
-            {currentTopicName} <i className="fa-solid fa-chevron-right mx-2 text-[8px]"></i> 
-            <span className="text-[#102B45] font-bold">{currentContent.title}</span>
-        </nav>
-
-        <h1 className="font-['Montserrat'] text-3xl font-black mb-8 border-l-8 border-yellow-500 pl-4 tracking-tight uppercase">
-            {currentContent.title}
-        </h1>
-
-        {/* ТЕОРИЯ БӨЛІМІ */}
-        <section className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 mb-10">
-            <div className="flex items-center gap-3 mb-4 text-emerald-600 font-bold">
-                <i className="fa-solid fa-book-open"></i>
-                <span>Теория (Ереже)</span>
+        {/* НАВИГАЦИЯ ЖӘНЕ ТАҚЫРЫП */}
+        <div className="mb-10">
+            <div className="text-[10px] md:text-xs font-bold text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                <span>{gradeId}-СЫНЫП</span> <span>›</span> <span>{topicId.replace('-', ' ')}</span> <span>›</span> <span className="text-[#102B45]">САБАҚ ДАЙЫНДАЛУДА 🛠</span>
             </div>
-            <div className="prose prose-blue max-w-none text-lg leading-relaxed">
-                <p>{currentContent.theory}</p>
-            </div>
-        </section>
+            <h1 className="text-3xl md:text-5xl font-black uppercase border-l-8 border-yellow-500 pl-4 text-[#102B45] leading-tight">
+                {lessonData.title}
+            </h1>
+        </div>
 
-        {/* ВИДЕО БӨЛІМІ */}
-        <section className="mb-10">
-            <div className="flex items-center gap-3 mb-4 text-blue-600 font-bold">
-                <i className="fa-solid fa-play-circle text-xl"></i>
-                <span>Видео түсіндірме</span>
+        <div className="flex flex-col gap-10">
+            
+            {/* 1. ТЕОРИЯ БЛОГЫ (Жасыл) */}
+            <div>
+                <h3 className="text-emerald-500 font-black flex items-center gap-2 text-sm uppercase tracking-widest mb-3 pl-2">
+                    <i className="fa-solid fa-book-open"></i> Теория (Ереже)
+                </h3>
+                <div className="bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-gray-100">
+                    <div className="text-gray-700 font-medium leading-loose text-base whitespace-pre-wrap">
+                        {lessonData.theory}
+                    </div>
+                </div>
             </div>
-            <div className="relative aspect-video bg-black rounded-3xl overflow-hidden shadow-2xl group border-4 border-[#102B45]">
-                {currentContent.videoLocked ? (
-                    <>
-                        <div className="absolute inset-0 bg-black/70 z-10 flex flex-col items-center justify-center text-white p-6 text-center">
-                            <i className="fa-solid fa-lock text-5xl text-yellow-500 mb-4"></i>
-                            <h3 className="text-xl font-bold mb-2 font-['Montserrat']">Бұл видео тек жазылушыларға қолжетімді</h3>
-                            <p className="text-sm text-gray-300 mb-6 font-medium">Толық түсіндірмені көру үшін Premium пакетін алыңыз</p>
-                            <button className="bg-yellow-500 text-[#102B45] px-8 py-3 rounded-full font-black hover:bg-yellow-400 transition shadow-lg text-xs uppercase tracking-widest">
-                                Premium-ды ашу
-                            </button>
-                        </div>
-                        <img 
-                            src="https://images.unsplash.com/photo-1516321318423-f06f85e504b3?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80" 
-                            className="w-full h-full object-cover opacity-40" 
-                            alt="Video cover" 
-                        />
-                    </>
-                ) : (
+
+            {/* 2. ВИДЕО БЛОГЫ (Көк) */}
+            <div>
+                <h3 className="text-blue-600 font-black flex items-center gap-2 text-sm uppercase tracking-widest mb-3 pl-2">
+                    <i className="fa-solid fa-circle-play"></i> Видео түсіндірме
+                </h3>
+                <div className="rounded-3xl overflow-hidden shadow-lg bg-black aspect-video relative group">
+                    {lessonData.video_locked ? (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-white bg-gradient-to-br from-black/80 to-gray-900 bg-[url('https://images.unsplash.com/photo-1516321318423-f06f85e504b3?q=80&w=1000&auto=format&fit=crop')] bg-cover bg-center bg-blend-overlay">
+                        <i className="fa-solid fa-lock text-5xl text-yellow-500 mb-4 drop-shadow-lg"></i>
+                        <h3 className="text-xl md:text-2xl font-black mb-2 text-center">Бұл видео тек жазылушыларға қолжетімді</h3>
+                        <p className="text-xs font-bold text-gray-300 mb-6 text-center">Толық түсіндірмені көру үшін Premium пакетін алыңыз</p>
+                        <button className="bg-yellow-500 text-[#102B45] px-8 py-3 rounded-full font-black hover:bg-yellow-400 transition shadow-lg text-xs uppercase tracking-widest">
+                            Premium-ды ашу
+                        </button>
+                    </div>
+                    ) : (
                     <iframe 
-                        className="w-full h-full absolute top-0 left-0"
-                        src={currentContent.videoUrl} 
-                        title="YouTube video player" 
-                        frameBorder="0" 
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                        className="w-full h-full absolute top-0 left-0" 
+                        src={getEmbedUrl(lessonData.video_url)} 
+                        title={lessonData.title} 
                         allowFullScreen>
                     </iframe>
-                )}
+                    )}
+                </div>
             </div>
-        </section>
 
-        {/* ОЙЫН (QUIZ) БӨЛІМІ */}
-        <section className="mb-20">
-            <div className="flex items-center gap-3 mb-4 text-purple-600 font-bold">
-                <i className="fa-solid fa-gamepad text-xl"></i>
-                <span>Біліміңді тексер (Ойын)</span>
-            </div>
-            
-            <div className={`p-10 rounded-3xl text-center text-white shadow-xl relative overflow-hidden transition-all duration-500 ${gameState === 'playing' ? 'bg-purple-900' : 'bg-gradient-to-br from-purple-700 to-[#102B45]'}`}>
-                {gameState !== 'playing' && <div className="absolute top-0 right-0 p-4 opacity-10 text-9xl pointer-events-none">❓</div>}
-
-                {/* Бастау экраны */}
-                {gameState === 'start' && (
-                  <div>
-                      <h3 className="font-['Montserrat'] text-2xl font-black mb-4 uppercase">Kahoot стиліндегі тест</h3>
-                      <p className="mb-8 opacity-80 max-w-md mx-auto font-medium">Ойынды ойнап, ұпай жинаңыз және рейтингте көш бастаңыз!</p>
-                      <button onClick={handleStart} className="bg-white text-purple-700 px-10 py-4 rounded-2xl font-black text-lg hover:bg-gray-100 transition shadow-xl hover:scale-105 transform uppercase tracking-widest">
-                          Ойынды бастау
-                      </button>
-                  </div>
-                )}
-
-                {/* Ойын экраны */}
-                {gameState === 'playing' && (
-                  <div className="text-left animate-in fade-in duration-500">
-                      <div className="flex justify-between items-center text-sm mb-6 pb-4 border-b border-purple-400/30">
-                          <span className="font-bold uppercase tracking-widest">Сұрақ: {currentIdx + 1} / {quizData.length}</span>
-                          <span className="text-yellow-400 font-black tracking-widest uppercase">Ұпай: {score}</span>
-                      </div>
-
-                      <h3 className="font-['Montserrat'] text-xl md:text-2xl font-black mb-10 leading-snug">
-                          {quizData[currentIdx].question}
-                      </h3>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                          {quizData[currentIdx].answers.map((ans, i) => (
-                            <button 
-                              key={i}
-                              onClick={() => handleAnswer(ans)}
-                              className={`p-6 rounded-xl text-lg font-bold text-left transition duration-300 transform border-2 flex justify-between items-center
-                                ${selectedAnswer ? (ans.correct ? 'bg-emerald-600 border-emerald-400 scale-105 shadow-[0_0_20px_rgba(52,211,153,0.5)]' : (selectedAnswer === ans ? 'bg-red-600 border-red-400 shadow-[0_0_20px_rgba(248,113,113,0.5)]' : 'bg-white/5 border-white/5 opacity-50')) 
-                                : 'bg-white/10 border-white/5 hover:bg-white/20 hover:border-white/20 hover:scale-[1.02]'}`}
-                            >
-                              {ans.text}
-                              {selectedAnswer && ans.correct && <i className="fa-solid fa-circle-check text-2xl"></i>}
-                              {selectedAnswer && !ans.correct && selectedAnswer === ans && <i className="fa-solid fa-circle-xmark text-2xl"></i>}
+            {/* 3. ОЙЫН БЛОГЫ (Күлгін) */}
+            <div>
+                <h3 className="text-purple-600 font-black flex items-center gap-2 text-sm uppercase tracking-widest mb-3 pl-2">
+                    <i className="fa-solid fa-gamepad"></i> Біліміңді тексер (Ойын)
+                </h3>
+                
+                <section className="bg-gradient-to-br from-[#5B21B6] to-[#1E1B4B] p-8 md:p-14 rounded-[2rem] text-white text-center shadow-xl relative overflow-hidden">
+                    <div className="absolute right-10 top-1/2 -translate-y-1/2 opacity-10 text-[10rem] font-black pointer-events-none">
+                        ?
+                    </div>
+                    
+                    {quizzes.length === 0 ? (
+                    <div className="py-6 relative z-10">
+                        <h3 className="text-xl font-black uppercase text-gray-300 tracking-widest">Тапсырма дайындалуда...</h3>
+                    </div>
+                    ) : (
+                    <>
+                        {gameState === 'start' && (
+                        <div className="py-8 relative z-10">
+                            <h3 className="text-3xl md:text-4xl font-black mb-4 uppercase tracking-widest">KAHOOT СТИЛІНДЕГІ ТЕСТ</h3>
+                            <p className="text-purple-200 font-medium mb-10 max-w-sm mx-auto">Ойынды ойнап, ұпай жинаңыз және рейтингте көш бастаңыз!</p>
+                            <button onClick={() => setGameState('playing')} className="bg-white text-purple-900 px-12 py-4 rounded-xl font-black text-lg hover:scale-105 transition shadow-lg uppercase tracking-widest">
+                            Ойынды бастау
                             </button>
-                          ))}
-                      </div>
-                  </div>
-                )}
+                        </div>
+                        )}
 
-                {/* Нәтиже экраны */}
-                {gameState === 'result' && (
-                  <div className="py-10 animate-in zoom-in duration-500">
-                      <i className="fa-solid fa-trophy text-6xl text-yellow-500 mb-6 drop-shadow-lg"></i>
-                      <h3 className="font-['Montserrat'] text-3xl font-black mb-4 uppercase">Ойын аяқталды!</h3>
-                      <p className={`text-xl mb-10 font-bold ${score === (quizData.length * 10) ? 'text-emerald-300' : 'text-yellow-300'}`}>
-                        {score === (quizData.length * 10) ? 'Керемет! Сен барлық сұраққа дұрыс жауап бердің.' : `Жиған ұпайың: ${score}`}
-                      </p>
-                      <button onClick={() => window.location.reload()} className="bg-white text-purple-700 px-8 py-3 rounded-xl font-black hover:bg-gray-100 transition shadow-md uppercase tracking-widest text-sm">
-                          Қайта ойнау
-                      </button>
-                  </div>
-                )}
+                        {gameState === 'playing' && (
+                        <div className="animate-in fade-in duration-500 text-left relative z-10">
+                            <div className="flex justify-between items-center border-b border-white/10 pb-4 mb-8">
+                                <span className="bg-white/20 px-4 py-1 rounded-full text-white font-black uppercase tracking-widest text-xs">Сұрақ {currentIdx + 1} / {quizzes.length}</span>
+                                <div className="text-white font-black uppercase tracking-widest text-xs">Ұпай: <span className="text-yellow-400 text-base">{score}</span></div>
+                            </div>
+                            
+                            <h3 className="text-2xl md:text-3xl font-black mb-8 leading-tight text-center md:text-left">
+                            {quizzes[currentIdx].question}
+                            </h3>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {quizzes[currentIdx].answers.map((ans, i) => (
+                                <button key={i} onClick={() => handleAnswer(ans.is_correct)} className="bg-white/10 p-6 rounded-2xl font-bold text-lg hover:bg-white text-white hover:text-purple-900 border-b-4 border-black/20 hover:border-purple-300 transition-all duration-300 hover:-translate-y-1 text-left shadow-md">
+                                {ans.answer_text}
+                                </button>
+                            ))}
+                            </div>
+                        </div>
+                        )}
+
+                        {gameState === 'result' && (
+                        <div className="animate-in zoom-in duration-500 py-8 relative z-10">
+                            <h3 className="text-4xl font-black mb-2 uppercase">Керемет!</h3>
+                            <p className="text-purple-200 font-bold uppercase tracking-widest mb-6">Сенің нәтижең</p>
+                            <div className="text-6xl font-black text-yellow-400 mb-10">
+                                {score} <span className="text-2xl text-white/50">/ {quizzes.length * 10}</span>
+                            </div>
+                            <button onClick={() => window.location.reload()} className="bg-white text-purple-900 px-8 py-3 rounded-xl font-black hover:scale-105 transition shadow-lg uppercase tracking-widest text-sm">
+                                Қайта ойнау
+                            </button>
+                        </div>
+                        )}
+                    </>
+                    )}
+                </section>
             </div>
-        </section>
 
+        </div>
       </main>
-
-      <footer className="bg-[#102B45] text-white py-10 text-center text-[10px] font-bold uppercase tracking-[0.4em] opacity-40">
-          <p>© 2026 Tilim Платформасы</p>
-      </footer>
-
     </div>
   );
 };

@@ -1,65 +1,54 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
 
 const Grades = () => {
   const { id } = useParams();
+  
+  // Серверден келетін мәліметті сақтайтын орын (state)
+  const [gradeData, setGradeData] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  // Әр сыныптың бөлімдері (Topics)
-  const gradesData = {
-    "5": {
-      title: "5-сынып",
-      subtitle: "ПӘНДІК БАҒДАРЛАМА БОЙЫНША 3 НЕГІЗГІ БӨЛІМ",
-      topics: [
-        { title: "ФОНЕТИКА", desc: "ДЫБЫС, БУЫН, ҮНДЕСТІК ЗАҢЫ (12 САБАҚ)", path: "/grades/5/phonetics" },
-        { title: "МОРФОЛОГИЯ", desc: "ТҮБІР МЕН ҚОСЫМША, ЖҰРНАҚ (8 САБАҚ)", path: "/grades/5/morphology" },
-        { title: "СӨЗ ТАБЫ", desc: "ЗАТ ЕСІМ, СЫН ЕСІМ, САН ЕСІМ (9 САБАҚ)", path: "/grades/5/section" }
-      ]
-    },
-    "6": {
-      title: "6-сынып",
-      subtitle: "ЛЕКСИКА ЖӘНЕ ФРАЗЕОЛОГИЯ НЕГІЗДЕРІ",
-      topics: [
-        { title: "ЛЕКСИКА", desc: "СӨЗ МАҒЫНАСЫ, СИНОНИМ, АНТОНИМ (10 САБАҚ)", path: "/grades/6/lexis" },
-        { title: "ФРАЗЕОЛОГИЯ", desc: "ТҰРАҚТЫ СӨЗ ТІРКЕСТЕРІ (6 САБАҚ)", path: "/grades/6/phraseology" },
-        { title: "ЕСІМДІК", desc: "ЕСІМДІКТІҢ ТҮРЛЕРІ МЕН ТҰЛҒАСЫ (8 САБАҚ)", path: "/grades/6/pronoun" }
-      ]
-    },
-    "7": {
-      title: "7-сынып",
-      subtitle: "ҮСТЕУ ЖӘНЕ КӨМЕКШІ СӨЗДЕР",
-      topics: [
-        { title: "ҮСТЕУ", desc: "ҮСТЕУДІҢ МАҒЫНАЛЫҚ ТҮРЛЕРІ (8 САБАҚ)", path: "/grades/7/adverb" },
-        { title: "ЕЛІКТЕУ СӨЗДЕР", desc: "БЕЙНЕЛЕУІШ ЖӘНЕ ДЫБЫСТЫҚ ЕЛІКТЕУІШ (5 САБАҚ)", path: "/grades/7/mimic" },
-        { title: "ОДАҒАЙ", desc: "ОДАҒАЙДЫҢ ТҮРЛЕРІ МЕН ТЫНЫС БЕЛГІСІ (4 САБАҚ)", path: "/grades/7/interjection" }
-      ]
-    },
-    "8": {
-      title: "8-сынып",
-      subtitle: "СИНТАКСИС ЖӘНЕ СӨЙЛЕМ МҮШЕЛЕРІ",
-      topics: [
-        { title: "СӨЙЛЕМ МҮШЕЛЕРІ", desc: "ТҰРЛАУЛЫ ЖӘНЕ ТҰРЛАУСЫЗ МҮШЕЛЕР (12 САБАҚ)", path: "/grades/8/syntax" },
-        { title: "ЖАЙ СӨЙЛЕМ", desc: "ЖАЙ СӨЙЛЕМНІҢ ТҮРЛЕРІ МЕН ҚҰРЫЛЫСЫ (10 САБАҚ)", path: "/grades/8/simple-sentence" }
-      ]
-    },
-    "9": {
-      title: "9-сынып",
-      subtitle: "ҚҰРМАЛАС СӨЙЛЕМ СИНТАКСИСІ",
-      topics: [
-        { title: "ҚҰРМАЛАС СӨЙЛЕМ", desc: "САЛАЛАС, САБАҚТАС ҚҰРМАЛАС СӨЙЛЕМ (15 САБАҚ)", path: "/grades/9/complex-sentence" },
-        { title: "ШЕШЕНДІК ӨНЕР", desc: "ШЕШЕНДІК СӨЗДЕР МЕН СӨЙЛЕУ МӘДЕНИЕТІ (6 САБАҚ)", path: "/grades/9/rhetoric" }
-      ]
-    }
-  };
+  // Бет ашылған кезде Бэкендке (Go серверіне) сұрау жіберу
+  useEffect(() => {
+    setLoading(true);
+    // НАЗАР АУДАРЫҢЫЗ: Біз енді мәліметті 8080 порттағы базадан алып жатырмыз!
+    fetch(`http://localhost:8080/api/grades/${id}`)
+      .then((response) => response.json())
+      .then((data) => {
+        setGradeData(data);
+        setLoading(false);
+      })
+      .catch((error) => {
+        console.error("Серверден мәлімет алу кезінде қате шықты:", error);
+        setLoading(false);
+      });
+  }, [id]);
 
-  // URL-дегі ID арқылы мәліметті алу (қате болса 5-сынып ашылады)
-  const currentGrade = gradesData[id] || gradesData["5"];
-  // Қай сыныпта тұрғанымызды анықтау үшін (қате болса 5 шығады)
-  const activeGradeId = gradesData[id] ? id : "5";
+  // Егер мәлімет әлі серверден келіп үлгермесе, "Жүктелуде" деп тұрады
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-2xl font-black text-[#102B45] animate-pulse">Мәліметтер базадан жүктелуде... ⏳</div>
+      </div>
+    );
+  }
+
+  // Егер базада бұл сынып жоқ болса (мысалы 6-сыныпты бассаңыз)
+  if (!gradeData || gradeData.error) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
+        <h1 className="text-4xl font-black text-[#102B45] mb-4">Бұл сынып әлі базаға қосылмаған 🛠</h1>
+        <Link to="/" className="text-yellow-500 font-bold hover:underline">Басты бетке қайту</Link>
+      </div>
+    );
+  }
+
+  const activeGradeId = gradeData.id.toString();
 
   return (
     <div className="min-h-screen flex flex-col antialiased bg-white font-['Inter']">
       
-      {/* 1. Жоғарғы мәзір (Header) */}
+      {/* HEADER */}
       <header className="bg-white border-b border-gray-100 py-4">
         <div className="container mx-auto px-6 flex justify-between items-center">
             <Link to="/"><img src="/logo.png" alt="Tilim" className="h-10 w-auto hover:scale-105 transition" /></Link>
@@ -71,7 +60,7 @@ const Grades = () => {
         <div className="container mx-auto px-6 flex justify-between items-center">
             <nav className="flex gap-6 text-[11px] font-bold uppercase tracking-[0.15em]">
                 <Link to="/" className="hover:text-yellow-400 transition">Басты бет</Link>
-                <Link to={`/grades/${activeGradeId}`} className="text-yellow-400 font-black">Сыныптар</Link>
+                <span className="text-yellow-400 font-black">Сыныптар</span>
             </nav>
             <div className="bg-yellow-500 text-[#102B45] px-4 py-1 rounded-lg font-black text-[10px] uppercase tracking-tighter shadow-sm">Белсенді</div>
         </div>
@@ -100,25 +89,22 @@ const Grades = () => {
             </div>
         </div>
 
-        {/* ТАҚЫРЫПТАР КАРТОЧКАСЫ */}
-        <div className="mt-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
-            <div className="flex items-center gap-5 mb-4">
-                <div className="w-2.5 h-14 bg-yellow-500 rounded-full shadow-[0_0_15px_rgba(234,179,8,0.5)]"></div>
-                <h1 className="font-['Montserrat'] text-6xl font-black text-[#102B45] tracking-tighter uppercase">{currentGrade.title}</h1>
-            </div>
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-[0.3em] mb-14 ml-8">{currentGrade.subtitle}</p>
+        {/* ДИНАМИКАЛЫҚ ТАҚЫРЫПТАР (БАЗАДАН КЕЛЕДІ) */}
+        <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
+            <h1 className="font-['Montserrat'] text-5xl md:text-6xl font-black text-[#102B45] mb-2 uppercase border-l-8 border-yellow-500 pl-6">{gradeData.title}</h1>
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-[0.3em] mb-14 ml-8">{gradeData.subtitle}</p>
 
-            <div className="flex flex-col gap-8">
-                {currentGrade.topics.map((topic, index) => (
+            <div className="flex flex-col gap-6 mt-10">
+                {gradeData.topics && gradeData.topics.map((topic, index) => (
                   <Link 
                     key={index} 
-                    to={topic.path} 
-                    className="bg-[#102B45] p-10 rounded-[3rem] flex justify-between items-center group relative overflow-hidden transition-all duration-300 hover:translate-x-4 hover:bg-[#1a3f61] hover:shadow-2xl"
+                    to={`/grades/${activeGradeId}/${topic.slug}`} 
+                    className="bg-[#102B45] p-10 rounded-[3rem] flex justify-between items-center group relative overflow-hidden transition-all duration-300 hover:translate-x-4 hover:shadow-2xl hover:bg-[#1a3f61]"
                   >
                     <div className="absolute -right-4 -top-4 opacity-[0.05] text-[10rem] text-white italic pointer-events-none group-hover:scale-110 transition-transform">⚜️</div>
                     <div className="relative z-10">
-                        <h2 className="font-['Montserrat'] text-4xl font-black text-white group-hover:text-yellow-400 transition-colors tracking-tight uppercase">{topic.title}</h2>
-                        <p className="text-[11px] font-bold text-gray-300 uppercase tracking-widest mt-2 opacity-80">{topic.desc}</p>
+                        <h2 className="font-['Montserrat'] text-3xl md:text-4xl font-black text-white group-hover:text-yellow-400 uppercase">{topic.title}</h2>
+                        <p className="text-gray-300 mt-2 text-[10px] md:text-xs tracking-widest uppercase font-bold opacity-80">{topic.description}</p>
                     </div>
                     <div className="relative z-10 w-14 h-14 bg-yellow-500 rounded-full flex items-center justify-center text-[#102B45] font-black text-2xl group-hover:scale-110 transition shadow-lg shadow-yellow-500/20">
                         →
@@ -129,13 +115,11 @@ const Grades = () => {
         </div>
       </main>
 
-      {/* FOOTER */}
       <footer className="bg-[#102B45] text-white py-12 border-t-8 border-yellow-500 mt-auto">
         <div className="container mx-auto px-6 text-center opacity-40 text-[10px] font-black uppercase tracking-[0.5em]">
-            © 2026 ТІЛІМ ПЛАТФОРМАСЫ — ЕСКІРМЕЙТІН ЕРЕЖЕ, ЖАҢАША ЗЕРДЕ
+            © 2026 ТІЛІМ ПЛАТФОРМАСЫ
         </div>
       </footer>
-
     </div>
   );
 };

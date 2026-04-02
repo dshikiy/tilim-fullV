@@ -8,6 +8,8 @@ import Section from './pages/Section';
 import Topic from './pages/Topic';
 import Phonetics from './pages/Phonetics';
 import TopicList from './pages/TopicList'; // <-- ОСЫ ЖОЛ ҚОСЫЛДЫ! БҰЛ ӨТЕ МАҢЫЗДЫ!
+import Admin from './pages/Admin';
+import Profile from './pages/Profile';
 
 function App() {
   return (
@@ -26,12 +28,14 @@ function App() {
         {/* Сабақтың өзі (ойыны мен видеосы бар бет) */}
         <Route path="/topic" element={<Topic />} />
 
-        
+        <Route path="/admin" element={<Admin />} />
+
         <Route path="/grades/:gradeId/:topicId/:lessonId" element={<Topic />} />
-        
+
         {/* Ескі статикалық беттер (керек болса қалдырыңыз) */}
         <Route path="/section" element={<Section />} />
         <Route path="/phonetics" element={<Phonetics />} />
+        <Route path="/profile" element={<Profile />} />
       </Routes>
     </Router>
   );
