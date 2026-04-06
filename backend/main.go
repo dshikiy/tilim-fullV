@@ -1,25 +1,88 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
+	"io"
 	"log"
 	"net/http"
 	"os"
+	"sync"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gorilla/websocket"
+	"github.com/joho/godotenv"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
+// =================== WEBSOCKET БАПТАУЛАРЫ ===================
+var upgrader = websocket.Upgrader{
+	CheckOrigin: func(r *http.Request) bool {
+		return true // CORS рұқсат беру
+	},
+}
+
+type Room struct {
+	Clients map[*websocket.Conn]string // Connection -> Username
+	Mutex   sync.Mutex
+}
+
+var rooms = make(map[string]*Room)
+var roomsMutex sync.Mutex
+
+// =================== ЖАҢА МОДЕЛЬДЕР (ИИ ЧАТ ЖӘНЕ БӨЛМЕЛЕР ҮШІН) ===================
+
+type AIChat struct {
+	ID        uint      `json:"id" gorm:"primaryKey"`
+	UserEmail string    `json:"user_email"`
+	Role      string    `json:"role"` // "user" (оқушы) немесе "ai" (мұғалім)
+	Message   string    `json:"message"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+type RoomHistory struct {
+	ID        uint      `json:"id" gorm:"primaryKey"`
+	RoomCode  string    `json:"room_code"`
+	UserName  string    `json:"user_name"`
+	Type      string    `json:"type"` // "chat" немесе "draw" (тақта үшін)
+	Data      string    `json:"data"` // JSON форматындағы мәлімет
+	CreatedAt time.Time `json:"created_at"`
+}
+
 // =================== МОДЕЛЬДЕР (БАЗА КЕСТЕЛЕРІ) ===================
+type CustomGame struct {
+	ID          uint   `json:"id"`
+	AuthorEmail string `json:"author_email"`
+	AuthorName  string `json:"author_name"`
+	Type        int    `json:"type"`
+	Title       string `json:"title"`
+	Questions   string `json:"questions"` // JSON түрінде (string болып) сақтаймыз
+	IsPublic    bool   `json:"is_public"` // True болса барлық студенттер көреді
+}
+
 type User struct {
 	ID       uint   `json:"id"`
 	Email    string `json:"email"`
 	Password string `json:"password"`
 	Role     string `json:"role"` // "admin" немесе "student"
 
-	FullName string `json:"full_name"` // Толық аты
-	City     string `json:"city"`      // Қаласы
-	Score    int    `json:"score"`     // Жинаған ұпайы
+	FullName         string     `json:"full_name"`
+	City             string     `json:"city"`
+	Score            int        `json:"score"`
+	CompletedLessons int        `json:"completed_lessons"`
+	Accuracy         int        `json:"accuracy"`
+	Activities       []Activity `json:"history" gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE;"`
+}
+
+type Activity struct {
+	ID     uint   `json:"id"`
+	UserID uint   `json:"user_id"`
+	Title  string `json:"title"`
+	Date   string `json:"date"`
+	Points int    `json:"points"`
+	Type   string `json:"type"`
 }
 
 type Grade struct {
@@ -44,7 +107,7 @@ type Lesson struct {
 	Title       string `json:"title"`
 	Theory      string `json:"theory"`
 	VideoURL    string `json:"video_url"`
-	ImageURL    string `json:"image_url"` // ФОТО ЖҮКТЕУ ҮШІН ЖАҢА БАҒАН!
+	ImageURL    string `json:"image_url"`
 	VideoLocked bool   `json:"video_locked"`
 	Slug        string `json:"slug"`
 	Quizzes     []Quiz `json:"quizzes" gorm:"foreignKey:LessonID;constraint:OnDelete:CASCADE;"`
@@ -66,7 +129,7 @@ type QuizAnswer struct {
 
 var DB *gorm.DB
 
-// =================== БАЗАНЫ АВТОМАТТЫ ТОЛТЫРУ (SEEDER) ===================
+// =================== БАЗАНЫ АВТОМАТТЫ ТОЛТЫРУ ===================
 func seedData(db *gorm.DB) {
 	var userCount int64
 	db.Model(&User{}).Count(&userCount)
@@ -78,7 +141,6 @@ func seedData(db *gorm.DB) {
 	db.Model(&Grade{}).Count(&count)
 	if count == 0 {
 		grades := []Grade{
-			// =================== 5-СЫНЫП ===================
 			{
 				ID: 5, Title: "5-СЫНЫП", Subtitle: "Тіл негіздері (Основы)",
 				Topics: []Topic{
@@ -87,7 +149,6 @@ func seedData(db *gorm.DB) {
 					{Title: "Морфология (Бастамасы)", Description: "Түбір, қосымша, зат есім, сын есім, сан есім", Slug: "morphology-intro"},
 				},
 			},
-			// =================== 6-СЫНЫП ===================
 			{
 				ID: 6, Title: "6-СЫНЫП", Subtitle: "Сөзжасам және тереңдетілген лексика",
 				Topics: []Topic{
@@ -96,7 +157,6 @@ func seedData(db *gorm.DB) {
 					{Title: "Морфология (Жалғасы)", Description: "Есімдік, етістік (шақтары, райлары)", Slug: "morphology-cont"},
 				},
 			},
-			// =================== 7-СЫНЫП ===================
 			{
 				ID: 7, Title: "7-СЫНЫП", Subtitle: "Көмекші сөздер және орфография",
 				Topics: []Topic{
@@ -104,7 +164,6 @@ func seedData(db *gorm.DB) {
 					{Title: "Орфография (Дұрыс жазу)", Description: "Қиын жазылатын сөздердің емлесі, бас әріппен жазылатын сөздер", Slug: "orthography"},
 				},
 			},
-			// =================== 8-СЫНЫП ===================
 			{
 				ID: 8, Title: "8-СЫНЫП", Subtitle: "Жай сөйлем синтаксисі",
 				Topics: []Topic{
@@ -113,7 +172,6 @@ func seedData(db *gorm.DB) {
 					{Title: "Жай сөйлем түрлері", Description: "Жақты/жақсыз, жалаң/жайылма, толымды/толымсыз, оқшау сөздер", Slug: "simple-sentences"},
 				},
 			},
-			// =================== 9-СЫНЫП ===================
 			{
 				ID: 9, Title: "9-СЫНЫП", Subtitle: "Құрмалас сөйлем және риторика",
 				Topics: []Topic{
@@ -131,10 +189,27 @@ func seedData(db *gorm.DB) {
 	}
 }
 
+func broadcastToRoom(room *Room, message map[string]interface{}) {
+	room.Mutex.Lock()
+	defer room.Mutex.Unlock()
+	for client := range room.Clients {
+		client.WriteJSON(message)
+	}
+}
+
 // =================== НЕГІЗГІ СЕРВЕРДІ ҚОСУ ===================
 func main() {
-	// Пароль сіздің базаңызда "12345" екенін ұмытпаңыз
-	dsn := "host=localhost user=postgres password=12345 dbname=tilim_db port=5432 sslmode=disable"
+	// .env файлын оқу
+	err := godotenv.Load()
+	if err != nil {
+		log.Println("⚠️  .env файлын жүктеу мүмкін болмады, ортаның айнымалыларын тексеріңіз!")
+	}
+
+	dsn := os.Getenv("DATABASE_URL")
+	if dsn == "" {
+		// Егер бұлтты серверде DATABASE_URL жоқ болса, локальныйды қолданамыз (өз компьютеріңде тексеру үшін)
+		dsn = "host=localhost user=postgres password=12345 dbname=tilim_db port=5432 sslmode=disable"
+	}
 
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
@@ -143,21 +218,16 @@ func main() {
 	DB = db
 	log.Println("✅ PostgreSQL базасына сәтті қосылдық!")
 
-	// 1. Кестелерді құру
-	DB.AutoMigrate(&Grade{}, &Topic{}, &Lesson{}, &Quiz{}, &QuizAnswer{}, &User{})
+	// ЖАҢА КЕСТЕЛЕРДІ AutoMigrate ІШІНЕ ҚОСТЫҚ!
+	DB.AutoMigrate(&Grade{}, &Topic{}, &Lesson{}, &Quiz{}, &QuizAnswer{}, &User{}, &Activity{}, &CustomGame{}, &AIChat{}, &RoomHistory{})
 
-	// 2. Базаны толтыру функциясын шақыру
 	seedData(DB)
 
-	// ФОТОЛАР САҚТАЛАТЫН ПАПКА ҚҰРУ
 	os.MkdirAll("uploads", os.ModePerm)
 
 	r := gin.Default()
-
-	// СУРЕТТЕРДІ БРАУЗЕРГЕ КӨРСЕТУ ҮШІН СТАТИКАЛЫҚ ЖОЛ
 	r.Static("/uploads", "./uploads")
 
-	// CORS мәселесін шешу
 	r.Use(func(c *gin.Context) {
 		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
@@ -167,13 +237,11 @@ func main() {
 			c.AbortWithStatus(204)
 			return
 		}
-
 		c.Next()
 	})
 
 	// =================== API ЭНДПОИНТТЕР ===================
 
-	// 1. БАРЛЫҚ СЫНЫПТАРДЫ ТАРТУ
 	r.GET("/api/grades/:id", func(c *gin.Context) {
 		id := c.Param("id")
 		var grade Grade
@@ -184,7 +252,6 @@ func main() {
 		c.JSON(http.StatusOK, grade)
 	})
 
-	// 2. ЛОГИН
 	type LoginInput struct {
 		Email    string `json:"email"`
 		Password string `json:"password"`
@@ -201,30 +268,25 @@ func main() {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Логин немесе пароль қате!"})
 			return
 		}
-
 		c.JSON(http.StatusOK, gin.H{"message": "Сәтті кірдіңіз!", "role": user.Role})
 	})
 
-	// 3. ТІРКЕЛУ
 	r.POST("/api/register", func(c *gin.Context) {
 		var input User
 		if err := c.ShouldBindJSON(&input); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Мәлімет қате"})
 			return
 		}
-		
 		var existingUser User
 		if err := DB.Where("email = ?", input.Email).First(&existingUser).Error; err == nil {
 			c.JSON(http.StatusConflict, gin.H{"error": "Бұл пошта тіркеліп қойған!"})
 			return
 		}
-
 		input.Role = "student"
 		DB.Create(&input)
 		c.JSON(http.StatusOK, gin.H{"message": "Тіркелу сәтті!"})
 	})
 
-	// 4. ОҚУШЫЛАРДЫ АЛУ (АДМИНГЕ)
 	r.GET("/api/users", func(c *gin.Context) {
 		var users []User
 		if err := DB.Where("role = ?", "student").Find(&users).Error; err != nil {
@@ -234,10 +296,8 @@ func main() {
 		c.JSON(http.StatusOK, users)
 	})
 
-	// 5. АДМИН: СБРОС ПАРОЛЯ
 	r.PUT("/api/users/:id/reset", func(c *gin.Context) {
 		id := c.Param("id")
-		// Оқушының құпия сөзін 123456-ға өзгертеміз
 		if err := DB.Model(&User{}).Where("id = ?", id).Update("password", "123456").Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Қате шықты"})
 			return
@@ -254,7 +314,6 @@ func main() {
 		c.JSON(http.StatusOK, gin.H{"message": "Оқушы базадан толық өшірілді!"})
 	})
 
-	// 6. ФОТО ЖҮКТЕУ API
 	r.POST("/api/upload", func(c *gin.Context) {
 		file, err := c.FormFile("image")
 		if err != nil {
@@ -266,11 +325,9 @@ func main() {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Сурет сақталмады"})
 			return
 		}
-		// Суреттің толық сілтемесін фронтендке қайтарамыз
 		c.JSON(http.StatusOK, gin.H{"url": "http://localhost:8080/" + filename})
 	})
 
-	// 7. САБАҚ ҚОСУ (ФОТОМЕН)
 	type QuizAnswerInput struct {
 		AnswerText string `json:"answer_text"`
 		IsCorrect  bool   `json:"is_correct"`
@@ -284,7 +341,7 @@ func main() {
 		Title    string      `json:"title"`
 		Theory   string      `json:"theory"`
 		VideoURL string      `json:"video_url"`
-		ImageURL string      `json:"image_url"` // ЖАҢА ФОТО СІЛТЕМЕСІ
+		ImageURL string      `json:"image_url"`
 		Slug     string      `json:"slug"`
 		Quizzes  []QuizInput `json:"quizzes"`
 	}
@@ -296,11 +353,11 @@ func main() {
 		}
 
 		lesson := Lesson{
-			TopicID:  input.TopicID, 
-			Title:    input.Title, 
-			Theory:   input.Theory, 
-			VideoURL: input.VideoURL, 
-			ImageURL: input.ImageURL, 
+			TopicID:  input.TopicID,
+			Title:    input.Title,
+			Theory:   input.Theory,
+			VideoURL: input.VideoURL,
+			ImageURL: input.ImageURL,
 			Slug:     input.Slug,
 		}
 
@@ -322,7 +379,6 @@ func main() {
 		c.JSON(http.StatusOK, gin.H{"message": "Сабақ және тест сәтті сақталды!"})
 	})
 
-	// 8. САБАҚТЫ ӨШІРУ (КЕПІЛДІ 100% ЖҰМЫС ІСТЕЙТІН НҰСҚА)
 	r.DELETE("/api/lessons/:id", func(c *gin.Context) {
 		id := c.Param("id")
 		var lesson Lesson
@@ -336,16 +392,14 @@ func main() {
 			DB.Where("quiz_id = ?", q.ID).Delete(&QuizAnswer{})
 		}
 		DB.Where("lesson_id = ?", lesson.ID).Delete(&Quiz{})
-		
+
 		if err := DB.Delete(&lesson).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Өшіру мүмкін болмады"})
 			return
 		}
-
 		c.JSON(http.StatusOK, gin.H{"message": "Сабақ толық өшірілді!"})
 	})
 
-	// 9. ПРОФИЛЬ ЖАҢАРТУ
 	type ProfileInput struct {
 		Email    string `json:"email"`
 		FullName string `json:"full_name"`
@@ -361,38 +415,64 @@ func main() {
 		c.JSON(http.StatusOK, gin.H{"message": "Профиль сәтті сақталды!"})
 	})
 
-	// 10. ҰПАЙ ҚОСУ
 	type ScoreInput struct {
-		Email string `json:"email"`
-		Score int    `json:"score"`
+		Email       string `json:"email"`
+		Score       int    `json:"score"`
+		Title       string `json:"title"`
+		Type        string `json:"type"`
+		IsCompleted bool   `json:"is_completed"`
+		Accuracy    int    `json:"accuracy"`
 	}
 	r.POST("/api/add-score", func(c *gin.Context) {
 		var input ScoreInput
 		if err := c.ShouldBindJSON(&input); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Қате формат"})
 			return
 		}
+
 		var user User
 		if err := DB.Where("email = ?", input.Email).First(&user).Error; err == nil {
 			user.Score += input.Score
+
+			if input.Type == "lesson" && input.IsCompleted {
+				user.CompletedLessons += 1
+				if user.Accuracy == 0 {
+					user.Accuracy = input.Accuracy
+				} else {
+					user.Accuracy = (user.Accuracy + input.Accuracy) / 2
+				}
+			}
 			DB.Save(&user)
+
+			if input.Title != "" {
+				currentDate := time.Now().Format("02.01.2006 15:04")
+				newActivity := Activity{
+					UserID: user.ID,
+					Title:  input.Title,
+					Date:   currentDate,
+					Points: input.Score,
+					Type:   input.Type,
+				}
+				DB.Create(&newActivity)
+			}
 		}
-		c.JSON(http.StatusOK, gin.H{"message": "Ұпай қосылды!"})
+		c.JSON(http.StatusOK, gin.H{"message": "Ұпай мен тарих сәтті сақталды!"})
 	})
 
-	// 11. ОҚУШЫ ПРОФИЛІН КӨРУ
 	r.GET("/api/profile", func(c *gin.Context) {
 		email := c.Query("email")
 		var user User
-		
-		if err := DB.Where("email = ?", email).First(&user).Error; err != nil {
+
+		if err := DB.Preload("Activities", func(db *gorm.DB) *gorm.DB {
+			return db.Order("id desc")
+		}).Where("email = ?", email).First(&user).Error; err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Оқушы табылмады"})
 			return
 		}
-		user.Password = "" 
+		user.Password = ""
 		c.JSON(http.StatusOK, user)
 	})
 
-	// 12. ПАРОЛЬДІ АУЫСТЫРУ
 	type PasswordInput struct {
 		Email       string `json:"email"`
 		OldPassword string `json:"old_password"`
@@ -416,10 +496,11 @@ func main() {
 		c.JSON(http.StatusOK, gin.H{"message": "Құпия сөз сәтті ауыстырылды!"})
 	})
 
-	// ==========================================================
-	// ЖАСАНДЫ ИНТЕЛЛЕКТ ЧАТЫ (AI TUTOR)
-	// ==========================================================
+	// =========================================================================
+	// ЧАТ С ИИ (GROQ API + БАЗАҒА ТАРИХ САҚТАУ)
+	// =========================================================================
 	type ChatMessage struct {
+		Email   string `json:"email"` // БАЗАҒА САҚТАУ ҮШІН ПОШТА ҚОСЫЛДЫ
 		Message string `json:"message"`
 	}
 
@@ -430,18 +511,232 @@ func main() {
 			return
 		}
 
-		// Әзірге UI/UX тексеру үшін қарапайым алгоритм (Кейін ChatGPT/Gemini API қосамыз)
-		userMsg := input.Message
-		var reply string
-
-		if len(userMsg) < 2 {
-			reply = "Сәлем! Мен TILIM-нің жасанды интеллектісімін. Қазақ тілі грамматикасы бойынша қандай сұрағыңыз бар?"
-		} else {
-			reply = "Керемет сұрақ! Сіз: «" + userMsg + "» деп сұрадыңыз. Қазақ тілінде бұл ережені былай түсіндіруге болады: [Осы жерде нақты ИИ жауабы болады]. Тағы не білгіңіз келеді?"
+		apiKey := os.Getenv("GROQ_API_KEY")
+		if apiKey == "" {
+			c.JSON(http.StatusInternalServerError, gin.H{"reply": "Қате: Серверде GROQ_API_KEY бапталмаған! (.env файлын тексеріңіз)"})
+			return
 		}
 
-		c.JSON(http.StatusOK, gin.H{"reply": reply})
+		// 1. ОҚУШЫНЫҢ СҰРАҒЫН БАЗАҒА САҚТАУ
+		if input.Email != "" {
+			DB.Create(&AIChat{
+				UserEmail: input.Email,
+				Role:      "user",
+				Message:   input.Message,
+				CreatedAt: time.Now(),
+			})
+		}
+
+		systemContext := `Сен "TILIM" платформасының қазақ тілі пәні бойынша жеке виртуалды мұғалімісің (репетитор). 
+Сенің мақсатың — 5-9 сынып оқушыларына жай ғана ақпарат беру емес, олармен қалыпты сөйлесу, ОҚЫТУ, ТҮСІНДІРУ және АНАЛИЗ ЖАСАУ.
+
+Өзіңді нағыз тәжірибелі, мейірімді әрі ашық педагог ретінде ұста. Төмендегі қағидаларды қатаң сақта:
+
+1. Амандасу және Таныстыру: Егер оқушы жай ғана "Сәлем", "Қайырлы күн" деп жазса немесе нақты сұрақ қоймаса, онымен қалыпты адам сияқты жылы сөйлес. Өзіңді: "Сәлем! Мен TILIM платформасының виртуалды қазақ тілі мұғалімімін. Саған қазақ тілі грамматикасын үйренуге қуана көмектесемін!" деп таныстыр. Сосын "Қай сыныпта оқисың немесе бүгін қандай тақырыпты талдайық?" деп әңгімені өзің бастап жібер.
+2. Қалыпты диалог: Оқушы сұрақ қоймай, жай өз ойын айтса немесе әңгімелессе, бірден ереже сұрап қыспа. Оны қолдап, сөзіне қарай жауап бер.
+3. Қадаммен оқыту: Сабақ басталғанда бүкіл ақпаратты бірден төге салма. Алдымен шағын ережені түсіндір, сосын мысал келтір.
+4. Кері байланыс және Тексеру: Бір тақырыпты түсіндірген соң міндетті түрде: "Түсінікті болу үшін бір сұрақ қояйыншы..." немесе "Осы ережеге өзің бір мысал келтіріп көрші" деп оқушыны сөйлет.
+5. Анализ және Қатемен жұмыс: Егер оқушы қате жауап берсе немесе дұрыс түсінбесе, оған ұрыспа. Қатесін жұмсақ түрде түзеп, "Сенің мына тұста шатасып тұрғаныңды байқадым, бұл жердегі негізгі гәп мынада..." деп әлсіз тұсын (слабый жерін) талдап бер.
+6. Мотивация: Оқушы дұрыс жауап берсе: "Жарайсың!", "Керемет!", "Сен бұл тақырыпты өте жақсы меңгеріп алдың!" деп мақтап отыр.
+7. Пәннен ауытқымау: Егер оқушы "Маған математика түсіндірші" немесе "Ойын ойнайықшы" десе, "Кешір, мен тек қазақ тілі пәнінің мұғалімімін" деп сыпайы ескерт.`
+
+		requestBody, _ := json.Marshal(map[string]interface{}{
+			"model": "llama-3.3-70b-versatile",
+			"messages": []map[string]interface{}{
+				{"role": "system", "content": systemContext},
+				{"role": "user", "content": input.Message},
+			},
+			"temperature": 0.5,
+		})
+
+		url := "https://api.groq.com/openai/v1/chat/completions"
+		req, _ := http.NewRequest("POST", url, bytes.NewBuffer(requestBody))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+apiKey)
+
+		client := &http.Client{}
+		resp, err := client.Do(req)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"reply": "Кешіріңіз, ИИ серверімен байланыс үзілді."})
+			return
+		}
+		defer resp.Body.Close()
+
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		var groqResponse map[string]interface{}
+		json.Unmarshal(bodyBytes, &groqResponse)
+
+		var replyText string
+
+		if errorObj, ok := groqResponse["error"].(map[string]interface{}); ok {
+			if errMsg, ok := errorObj["message"].(string); ok {
+				replyText = "⚠️ Groq Қатесі: " + errMsg
+				log.Println("GROQ ҚАТЕСІ:", string(bodyBytes))
+			}
+		} else if choices, ok := groqResponse["choices"].([]interface{}); ok && len(choices) > 0 {
+			if choice, ok := choices[0].(map[string]interface{}); ok {
+				if message, ok := choice["message"].(map[string]interface{}); ok {
+					if content, ok := message["content"].(string); ok {
+						replyText = content
+					}
+				}
+			}
+		}
+
+		if replyText == "" {
+			replyText = "Кешіріңіз, мен сұрағыңызды түсінбедім."
+			log.Println("БЕЛГІСІЗ ЖАУАП:", string(bodyBytes))
+		}
+
+		// 2. ИИ-ДІҢ ЖАУАБЫН БАЗАҒА САҚТАУ
+		if input.Email != "" {
+			DB.Create(&AIChat{
+				UserEmail: input.Email,
+				Role:      "ai",
+				Message:   replyText,
+				CreatedAt: time.Now(),
+			})
+		}
+
+		c.JSON(http.StatusOK, gin.H{"reply": replyText})
 	})
 
-	r.Run(":8080")
+	// ЖАҢА: ИИ чат тарихын алу эндпоинті
+	r.GET("/api/chat/history", func(c *gin.Context) {
+		email := c.Query("email")
+		var history []AIChat
+		
+		// Соңғы 50 хабарламаны алу
+		DB.Where("user_email = ?", email).Order("created_at asc").Limit(50).Find(&history)
+		
+		c.JSON(http.StatusOK, history)
+	})
+
+	// =========================================================================
+	// CUSTOM GAMES API (ОЙЫН КОНСТРУКТОРЫ ҮШІН)
+	// =========================================================================
+	type CustomGameInput struct {
+		AuthorEmail string      `json:"author_email"`
+		AuthorName  string      `json:"author_name"`
+		Type        int         `json:"type"`
+		Title       string      `json:"title"`
+		Questions   interface{} `json:"questions"`
+		IsPublic    bool        `json:"is_public"`
+	}
+
+	r.POST("/api/custom-games", func(c *gin.Context) {
+		var input CustomGameInput
+		if err := c.ShouldBindJSON(&input); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Қате мәлімет"})
+			return
+		}
+
+		questionsBytes, _ := json.Marshal(input.Questions)
+
+		newGame := CustomGame{
+			AuthorEmail: input.AuthorEmail,
+			AuthorName:  input.AuthorName,
+			Type:        input.Type,
+			Title:       input.Title,
+			Questions:   string(questionsBytes),
+			IsPublic:    input.IsPublic,
+		}
+
+		DB.Create(&newGame)
+		c.JSON(http.StatusOK, gin.H{"message": "Ойын сақталды!"})
+	})
+
+	r.GET("/api/custom-games", func(c *gin.Context) {
+		email := c.Query("email")
+		var games []CustomGame
+
+		DB.Where("author_email = ? OR is_public = ?", email, true).Order("id desc").Find(&games)
+
+		c.JSON(http.StatusOK, games)
+	})
+
+	// =========================================================================
+	// WEBSOCKET ТОПТЫҚ ЖҰМЫС ҮШІН (НАҚТЫ УАҚЫТТА ЧАТ ЖӘНЕ ТАҚТА ТАРИХЫМЕН)
+	// =========================================================================
+	r.GET("/api/ws/room/:roomCode", func(c *gin.Context) {
+		roomCode := c.Param("roomCode")
+		userName := c.Query("user")
+		if userName == "" {
+			userName = "Аноним"
+		}
+
+		conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
+		if err != nil {
+			log.Println("WebSocket қатесі:", err)
+			return
+		}
+		defer conn.Close()
+
+		roomsMutex.Lock()
+		if rooms[roomCode] == nil {
+			rooms[roomCode] = &Room{Clients: make(map[*websocket.Conn]string)}
+		}
+		room := rooms[roomCode]
+		roomsMutex.Unlock()
+
+		room.Mutex.Lock()
+		room.Clients[conn] = userName
+		room.Mutex.Unlock()
+
+		joinMsg := map[string]interface{}{
+			"type":    "system",
+			"content": userName + " бөлмеге қосылды",
+		}
+		broadcastToRoom(room, joinMsg)
+
+		for {
+			var msg map[string]interface{}
+			err := conn.ReadJSON(&msg)
+			if err != nil {
+				room.Mutex.Lock()
+				delete(room.Clients, conn)
+				room.Mutex.Unlock()
+
+				leaveMsg := map[string]interface{}{
+					"type":    "system",
+					"content": userName + " бөлмеден шықты",
+				}
+				broadcastToRoom(room, leaveMsg)
+				break
+			}
+
+			// 1. БАЗАҒА БӨЛМЕ ХАБАРЛАМАСЫН САҚТАУ (Егер жүйелік хабарлама болмаса)
+			msgType, _ := msg["type"].(string)
+			if msgType != "system" {
+				msgBytes, _ := json.Marshal(msg)
+				DB.Create(&RoomHistory{
+					RoomCode:  roomCode,
+					UserName:  userName,
+					Type:      msgType,
+					Data:      string(msgBytes),
+					CreatedAt: time.Now(),
+				})
+			}
+
+			// 2. БАСҚАЛАРҒА ЖІБЕРУ
+			broadcastToRoom(room, msg)
+		}
+	})
+
+	// ЖАҢА: Бөлменің ескі тарихын (чат және тақта) алу эндпоинті
+	r.GET("/api/room/:roomCode/history", func(c *gin.Context) {
+		roomCode := c.Param("roomCode")
+		var history []RoomHistory
+		
+		DB.Where("room_code = ?", roomCode).Order("created_at asc").Find(&history)
+		
+		c.JSON(http.StatusOK, history)
+	})
+
+	// Серверді қосу (Render беретін динамикалық портты алу)
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	r.Run(":" + port)
 }
