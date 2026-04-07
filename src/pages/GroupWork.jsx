@@ -25,8 +25,8 @@ const GroupWork = () => {
   // Бөлмеге кіргенде WebSocket қосу
   useEffect(() => {
     if (inRoom && roomCode) {
-      // Go серверіңіздің WebSocket сілтемесіне қосылу
-      const socket = new WebSocket(`ws://localhost:8080/api/ws/room/${roomCode}?user=${userName}`);
+      // НАЗАР АУДАРЫҢЫЗ: СІЛТЕМЕ wss:// БОЛЫП ӨЗГЕРДІ 👇
+      const socket = new WebSocket(`wss://tilim-sqx4.onrender.com/api/ws/room/${roomCode}?user=${userName}`);
 
       socket.onopen = () => {
         console.log('Бөлмеге қосылдық:', roomCode);

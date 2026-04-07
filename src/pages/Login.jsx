@@ -11,7 +11,8 @@ const Login = () => {
     e.preventDefault();
     setError('');
     try {
-      const response = await fetch('http://localhost:8080/api/login', {
+      // СІЛТЕМЕ ОСЫ ЖЕРДЕ ӨЗГЕРДІ 👇
+      const response = await fetch('https://tilim-sqx4.onrender.com/api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })

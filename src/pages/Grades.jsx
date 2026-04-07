@@ -11,8 +11,8 @@ const Grades = () => {
   // Бет ашылған кезде Бэкендке (Go серверіне) сұрау жіберу
   useEffect(() => {
     setLoading(true);
-    // НАЗАР АУДАРЫҢЫЗ: Біз енді мәліметті 8080 порттағы базадан алып жатырмыз!
-    fetch(`http://localhost:8080/api/grades/${id}`)
+    // НАЗАР АУДАРЫҢЫЗ: Біз енді мәліметті бұлтты сервердегі базадан алып жатырмыз! 👇
+    fetch(`https://tilim-sqx4.onrender.com/api/grades/${id}`)
       .then((response) => response.json())
       .then((data) => {
         setGradeData(data);

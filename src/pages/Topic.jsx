@@ -30,7 +30,8 @@ const Topic = () => {
       return; 
     }
 
-    fetch(`http://localhost:8080/api/grades/${gradeId}`)
+    // СІЛТЕМЕ ОСЫ ЖЕРДЕ ӨЗГЕРДІ 👇
+    fetch(`https://tilim-sqx4.onrender.com/api/grades/${gradeId}`)
       .then(res => res.ok ? res.json() : null)
       .then(data => {
         if (data && data.topics) {
@@ -50,8 +51,8 @@ const Topic = () => {
   // =====================================================================
   useEffect(() => {
     if (gameState === 'result' && score > 0 && !scoreSaved && userEmail) {
-      // Бэкендке ұпайды сақтау туралы сұрау жібереміз
-      fetch('http://localhost:8080/api/add-score', {
+      // СІЛТЕМЕ ОСЫ ЖЕРДЕ ӨЗГЕРДІ 👇
+      fetch('https://tilim-sqx4.onrender.com/api/add-score', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: userEmail, score: score })

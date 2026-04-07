@@ -27,7 +27,7 @@ const Admin = () => {
   const fetchGrades = async () => {
     setLoading(true);
     try {
-      const res = await Promise.all([5, 6, 7, 8, 9].map(i => fetch(`http://localhost:8080/api/grades/${i}`)));
+      const res = await Promise.all([5, 6, 7, 8, 9].map(i => fetch(`https://tilim-sqx4.onrender.com/api/grades/${i}`)));
       const data = await Promise.all(res.map(r => r.ok ? r.json() : null));
       setGrades(data.filter(g => g !== null && !g.error));
     } catch (e) { console.error(e); }
@@ -35,7 +35,7 @@ const Admin = () => {
   };
  
   const fetchUsers = () => {
-    fetch('http://localhost:8080/api/users')
+    fetch('https://tilim-sqx4.onrender.com/api/users')
       .then(res => res.json())
       .then(data => setUsers(data))
       .catch(err => console.error(err));
@@ -49,7 +49,7 @@ const Admin = () => {
     const isConfirmed = window.confirm("Бұл сабақты өшіруге сенімдісіз бе? Оның видеосы мен тесттері біржолата өшеді!");
     if (!isConfirmed) return;
     try {
-      const response = await fetch(`http://localhost:8080/api/lessons/${lessonId}`, { method: 'DELETE' });
+      const response = await fetch(`https://tilim-sqx4.onrender.com/api/lessons/${lessonId}`, { method: 'DELETE' });
       if (response.ok) { alert("Сабақ сәтті өшірілді!"); fetchGrades(); }
       else alert("Өшіру мүмкін болмады!");
     } catch { alert("Сервермен байланыс үзілді."); }
@@ -58,7 +58,7 @@ const Admin = () => {
   const handleResetPassword = async (userId, userEmail) => {
     if (!window.confirm(`${userEmail} поштасының құпия сөзін "123456" етіп өзгертуге келісесіз бе?`)) return;
     try {
-      const res = await fetch(`http://localhost:8080/api/users/${userId}/reset`, { method: 'PUT' });
+      const res = await fetch(`https://tilim-sqx4.onrender.com/api/users/${userId}/reset`, { method: 'PUT' });
       if (res.ok) alert("✅ Құпия сөз '123456' болып өзгертілді!");
       else alert("Қате шықты");
     } catch { alert("Сервермен байланыс үзілді"); }
@@ -67,7 +67,7 @@ const Admin = () => {
   const handleDeleteUser = async (userId, userEmail) => {
     if (!window.confirm(`НАЗАР АУДАРЫҢЫЗ! ${userEmail} оқушысын базадан толық өшіруге сенімдісіз бе?`)) return;
     try {
-      const res = await fetch(`http://localhost:8080/api/users/${userId}`, { method: 'DELETE' });
+      const res = await fetch(`https://tilim-sqx4.onrender.com/api/users/${userId}`, { method: 'DELETE' });
       if (res.ok) {
         alert("✅ Оқушы сәтті өшірілді!");
         fetchUsers();
@@ -98,7 +98,7 @@ const Admin = () => {
       const formData = new FormData();
       formData.append('image', imageFile);
       try {
-        const imgRes = await fetch('http://localhost:8080/api/upload', { method: 'POST', body: formData });
+        const imgRes = await fetch('https://tilim-sqx4.onrender.com/api/upload', { method: 'POST', body: formData });
         if (imgRes.ok) {
           const imgData = await imgRes.json();
           uploadedImageUrl = imgData.url;
@@ -117,7 +117,7 @@ const Admin = () => {
     };
 
     try {
-      const response = await fetch('http://localhost:8080/api/lessons', {
+      const response = await fetch('https://tilim-sqx4.onrender.com/api/lessons', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)

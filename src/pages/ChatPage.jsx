@@ -26,7 +26,8 @@ const ChatPage = () => {
     setIsTyping(true);
 
     try {
-      const res = await fetch('http://localhost:8080/api/chat', {
+      // СІЛТЕМЕ ОСЫ ЖЕРДЕ ӨЗГЕРДІ 👇
+      const res = await fetch('https://tilim-sqx4.onrender.com/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: textToSend })

@@ -63,7 +63,7 @@ const Games = () => {
   const fetchCustomGames = async () => {
     if (!userEmail) return;
     try {
-      const res = await fetch(`http://localhost:8080/api/custom-games?email=${userEmail}`);
+      const res = await fetch(`https://tilim-sqx4.onrender.com/api/custom-games?email=${userEmail}`);
       const data = await res.json();
       if (!data.error) {
         setCreatedGames(data);
@@ -118,7 +118,7 @@ const Games = () => {
     }
 
     try {
-      await fetch('http://localhost:8080/api/add-score', {
+      await fetch('https://tilim-sqx4.onrender.com/api/add-score', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -199,7 +199,7 @@ const Games = () => {
     };
 
     try {
-      const res = await fetch('http://localhost:8080/api/custom-games', {
+      const res = await fetch('https://tilim-sqx4.onrender.com/api/custom-games', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(gamePayload)

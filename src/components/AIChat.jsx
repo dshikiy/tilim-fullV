@@ -24,7 +24,8 @@ const AIChat = () => {
     setIsTyping(true);
 
     try {
-      const res = await fetch('http://localhost:8080/api/chat', {
+      // МІНЕ, ОСЫ ЖЕРДЕГІ СІЛТЕМЕ ЖАҢА РЕНДЕР БЭКЕНДІНЕ АУЫСТЫРЫЛДЫ 👇
+      const res = await fetch('https://tilim-sqx4.onrender.com/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: userText })

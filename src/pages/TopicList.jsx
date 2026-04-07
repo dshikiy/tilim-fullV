@@ -14,8 +14,8 @@ const TopicList = () => {
       return;
     }
 
-    // Серверден нақты осы сыныпты тартамыз
-    fetch(`http://localhost:8080/api/grades/${gradeId}`)
+    // СІЛТЕМЕ ОСЫ ЖЕРДЕ ӨЗГЕРДІ 👇
+    fetch(`https://tilim-sqx4.onrender.com/api/grades/${gradeId}`)
       .then(res => res.json())
       .then(data => {
         if (data && data.topics) {

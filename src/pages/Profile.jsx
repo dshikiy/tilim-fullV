@@ -27,7 +27,7 @@ const Profile = () => {
       return;
     }
     
-    fetch(`http://localhost:8080/api/profile?email=${userEmail}`)
+    fetch(`https://tilim-sqx4.onrender.com/api/profile?email=${userEmail}`)
       .then(res => res.json())
       .then(data => {
         if (!data.error) {
@@ -47,7 +47,7 @@ const Profile = () => {
   // 2. Профильді сақтау (Аты-жөні, Қала)
   const handleSaveProfile = async (e) => {
     e.preventDefault();
-    const res = await fetch('http://localhost:8080/api/profile', {
+    const res = await fetch('https://tilim-sqx4.onrender.com/api/profile', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: userEmail, full_name: userData.full_name, city: userData.city })
@@ -58,7 +58,7 @@ const Profile = () => {
   // 3. Парольді ауыстыру
   const handleChangePassword = async (e) => {
     e.preventDefault();
-    const res = await fetch('http://localhost:8080/api/password', {
+    const res = await fetch('https://tilim-sqx4.onrender.com/api/password', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: userEmail, old_password: passData.old_password, new_password: passData.new_password })

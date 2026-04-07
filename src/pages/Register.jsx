@@ -11,7 +11,8 @@ const Register = () => {
     if (formData.password !== formData.confirmPassword) return setError('Құпия сөздер сәйкес емес!');
     
     try {
-      const res = await fetch('http://localhost:8080/api/register', {
+      // СІЛТЕМЕ ОСЫ ЖЕРДЕ ӨЗГЕРДІ 👇
+      const res = await fetch('https://tilim-sqx4.onrender.com/api/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: formData.email, password: formData.password })
