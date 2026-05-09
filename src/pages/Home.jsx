@@ -400,7 +400,7 @@ const Home = () => {
         }
         .grade-card:hover .grade-label { color: rgba(255,255,255,0.65); }
 
-        /* ── FEATURES / POSSIBILITIES SECTION (ЖАҢА) ── */
+        /* ── FEATURES / POSSIBILITIES SECTION ── */
         .features-section {
           background: white;
           padding: 80px 48px;
@@ -507,25 +507,61 @@ const Home = () => {
         .footer {
           background: var(--navy);
           border-top: 6px solid var(--gold);
-          padding: 48px;
+          padding: 60px 48px 40px;
         }
         .footer-inner {
           max-width: 1200px;
           margin: 0 auto;
           display: flex;
+          flex-direction: column;
+          gap: 32px;
+        }
+        .footer-top {
+          display: flex;
           align-items: center;
           justify-content: space-between;
           flex-wrap: wrap;
-          gap: 20px;
+          gap: 30px;
+        }
+        .footer-brand {
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
         }
         .footer-logo {
           font-family: 'Montserrat', sans-serif;
-          font-size: 22px;
+          font-size: 28px;
           font-weight: 900;
           color: white;
           letter-spacing: 0.15em;
         }
         .footer-logo span { color: var(--gold); }
+        
+        /* SOCIAL LINKS CSS */
+        .social-links {
+          display: flex;
+          gap: 12px;
+        }
+        .social-btn {
+          width: 44px; 
+          height: 44px;
+          border-radius: 12px;
+          background: rgba(255,255,255,0.05);
+          display: flex; 
+          align-items: center; 
+          justify-content: center;
+          color: var(--gold); 
+          font-size: 20px;
+          text-decoration: none; 
+          transition: all 0.3s;
+        }
+        .social-btn:hover {
+          background: var(--gold);
+          color: var(--navy);
+          transform: translateY(-3px);
+          box-shadow: 0 8px 20px rgba(234,179,8,0.25);
+        }
+
         .footer-links {
           display: flex;
           gap: 32px;
@@ -537,15 +573,22 @@ const Home = () => {
           font-weight: 600;
           letter-spacing: 0.2em;
           text-transform: uppercase;
-          color: rgba(255,255,255,0.35);
+          color: rgba(255,255,255,0.4);
           text-decoration: none;
           transition: color 0.2s;
         }
         .footer-links a:hover { color: var(--gold); }
+        
+        .footer-bottom {
+          width: 100%;
+          text-align: center;
+          padding-top: 32px;
+          border-top: 1px solid rgba(255,255,255,0.05);
+        }
         .footer-copy {
-          font-size: 10px;
+          font-size: 11px;
           font-weight: 600;
-          letter-spacing: 0.35em;
+          letter-spacing: 0.2em;
           text-transform: uppercase;
           color: rgba(255,255,255,0.2);
         }
@@ -558,6 +601,7 @@ const Home = () => {
           .grades-grid { grid-template-columns: repeat(2, 1fr); gap: 14px; }
           .about-inner { grid-template-columns: 1fr; gap: 40px; }
           .footer { padding: 40px 24px; }
+          .footer-top { flex-direction: column; align-items: center; text-align: center; }
         }
       `}</style>
 
@@ -676,7 +720,7 @@ const Home = () => {
         </div>
       </section>
 
-      {/* ── FEATURES / POSSIBILITIES (ЖАҢА ТОЛЫҚТЫРЫЛҒАН БӨЛІМ) ── */}
+      {/* ── FEATURES / POSSIBILITIES ── */}
       <section className="features-section" id="features">
         <div style={{maxWidth:'1200px', margin:'0 auto'}}>
           <div className="section-heading">
@@ -752,20 +796,37 @@ const Home = () => {
         </div>
       </section>
 
-      {/* ── FOOTER ── */}
+      {/* ── ЖАҢАРТЫЛҒАН FOOTER ── */}
       <footer className="footer">
         <div className="footer-inner">
-          <div className="footer-logo"><span>TILIM</span></div>
-          <ul className="footer-links">
-            <li><Link to="/">Бастау</Link></li>
-            <li><a href="#features">Мүмкіндіктер</a></li>
-            <li><a href="#about">Біз туралы</a></li>
-            <li><Link to="/games">Ойын</Link></li>
-            <li><Link to="/group-work">Топтық жұмыс</Link></li>
-            {/* Тек жүйеге кіргенде ғана Footer-де көрсетіледі */}
-            {isLoggedIn && <li><Link to="/chat">ИИ Чат</Link></li>}
-          </ul>
-          <p className="footer-copy">© 2026 ТІЛІМ ПЛАТФОРМАСЫ — Барлық құқықтар қорғалған</p>
+          <div className="footer-top">
+            <div className="footer-brand">
+              <div className="footer-logo"><span>TILIM</span></div>
+              
+              {/* ӘЛЕУМЕТТІК ЖЕЛІЛЕР БАТЫРМАЛАРЫ */}
+              <div className="social-links">
+                <a href="https://www.instagram.com/tilim.education?igsh=a2c2bGcxMzg5ZGI%3D&utm_source=qr" target="_blank" rel="noreferrer" className="social-btn" title="Instagram">
+                  <i className="fa-brands fa-instagram"></i>
+                </a>
+                <a href="https://www.tiktok.com/@tilim.education?_r=1&_t=ZS-9650X5mV2gb" target="_blank" rel="noreferrer" className="social-btn" title="TikTok">
+                  <i className="fa-brands fa-tiktok"></i>
+                </a>
+              </div>
+            </div>
+
+            <ul className="footer-links">
+              <li><Link to="/">Бастау</Link></li>
+              <li><a href="#features">Мүмкіндіктер</a></li>
+              <li><a href="#about">Біз туралы</a></li>
+              <li><Link to="/games">Ойын</Link></li>
+              <li><Link to="/group-work">Топтық жұмыс</Link></li>
+              {isLoggedIn && <li><Link to="/chat">ИИ Чат</Link></li>}
+            </ul>
+          </div>
+          
+          <div className="footer-bottom">
+            <p className="footer-copy">© 2026 TILIM БІЛІМ БЕРУ ПЛАТФОРМАСЫ — Барлық құқықтар қорғалған</p>
+          </div>
         </div>
       </footer>
     </>
