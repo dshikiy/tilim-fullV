@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
- 
+
 const Admin = () => {
   const [grades, setGrades] = useState([]);
   const [users, setUsers] = useState([]);
@@ -9,7 +9,11 @@ const Admin = () => {
   const [isAdding, setIsAdding] = useState(false);
   const [viewingUser, setViewingUser] = useState(null); // ПРОФИЛЬ КӨРУ ҮШІН СТЕЙТ
   const navigate = useNavigate();
- 
+
+  // ЖАҢА МОДУЛЬ ҚОСУ СТЕЙТТЕРІ
+  const [isAddingTopic, setIsAddingTopic] = useState(false);
+  const [newTopicName, setNewTopicName] = useState("");
+
   // СТАТИСТИКА
   const totalStudents = users.length;
   let totalLessons = 0;
@@ -23,7 +27,7 @@ const Admin = () => {
       fetchUsers();
     }
   }, [navigate]);
- 
+
   const fetchGrades = async () => {
     setLoading(true);
     try {
@@ -33,18 +37,18 @@ const Admin = () => {
     } catch (e) { console.error(e); }
     setLoading(false);
   };
- 
+
   const fetchUsers = () => {
     fetch('https://tilim-sqx4.onrender.com/api/users')
       .then(res => res.json())
       .then(data => setUsers(data))
       .catch(err => console.error(err));
   };
- 
+
   useEffect(() => {
     if (activeTab === 'students') fetchUsers();
   }, [activeTab]);
- 
+
   const handleDeleteLesson = async (lessonId) => {
     const isConfirmed = window.confirm("Бұл сабақты өшіруге сенімдісіз бе? Оның видеосы мен тесттері біржолата өшеді!");
     if (!isConfirmed) return;
@@ -74,13 +78,43 @@ const Admin = () => {
       } else alert("Қате шықты");
     } catch { alert("Сервермен байланыс үзілді"); }
   };
- 
+
+  // ЖАҢА МОДУЛЬ ҚОСУ ФУНКЦИЯСЫ
+  const handleCreateTopic = async () => {
+    if (!newTopicName.trim()) return alert("Бөлімнің атын жазыңыз!");
+    if (!selectedGrade) return alert("Алдымен сыныпты таңдаңыз!");
+
+    try {
+      const response = await fetch("https://tilim-sqx4.onrender.com/api/topics", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          grade_id: Number(selectedGrade),
+          title: newTopicName
+        })
+      });
+
+      if (response.ok) {
+        const addedTopic = await response.json();
+        await fetchGrades(); // Базаны жаңарту
+        setSelectedTopic(addedTopic.id.toString());
+        setIsAddingTopic(false);
+        setNewTopicName("");
+        alert("Жаңа бөлім сәтті қосылды!");
+      } else {
+        alert("Қате шықты!");
+      }
+    } catch (err) {
+      alert("Сервермен байланыс үзілді.");
+    }
+  };
+
   const [selectedGrade, setSelectedGrade] = useState('');
   const [selectedTopic, setSelectedTopic] = useState('');
   const [lessonData, setLessonData] = useState({ title: '', slug: '', theory: '', video_url: '' });
-  const [imageFile, setImageFile] = useState(null); // СУРЕТ ФАЙЛЫН САҚТАУ ҮШІН
+  const [imageFile, setImageFile] = useState(null); 
   const [quizzes, setQuizzes] = useState([{ question: '', answers: [{ answer_text: '', is_correct: true }, { answer_text: '', is_correct: false }, { answer_text: '', is_correct: false }, { answer_text: '', is_correct: false }] }]);
- 
+
   const addQuestion = () => setQuizzes([...quizzes, { question: '', answers: [{ answer_text: '', is_correct: true }, { answer_text: '', is_correct: false }, { answer_text: '', is_correct: false }, { answer_text: '', is_correct: false }] }]);
   const removeQuestion = (index) => setQuizzes(quizzes.filter((_, i) => i !== index));
   const setCorrectAnswer = (qIndex, aIndex) => {
@@ -88,7 +122,7 @@ const Admin = () => {
     newQ[qIndex].answers.forEach((ans, i) => { ans.is_correct = (i === aIndex); });
     setQuizzes(newQ);
   };
- 
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!selectedTopic) return alert("Бөлімді таңдаңыз!");
@@ -132,15 +166,15 @@ const Admin = () => {
       } else alert("Қате шықты! Мәліметтерді тексеріңіз.");
     } catch { alert("Сервермен байланыс жоқ!"); }
   };
- 
+
   return (
     <>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800;900&family=Inter:wght@300;400;500;600;700&display=swap');
         @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css');
- 
+
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
- 
+
         :root {
           --navy: #102B45;
           --navy-dark: #0b1e30;
@@ -149,9 +183,9 @@ const Admin = () => {
           --gold-hover: #FBBF24;
           --sidebar-w: 280px;
         }
- 
+
         .admin-root { display: flex; min-height: 100vh; background: #F1F5F9; font-family: 'Inter', sans-serif; color: var(--navy); }
- 
+
         /* ── SIDEBAR ── */
         .sidebar { width: var(--sidebar-w); background: var(--navy); position: fixed; top: 0; left: 0; bottom: 0; display: flex; flex-direction: column; z-index: 100; overflow: hidden; }
         .sidebar::after { content: ''; position: absolute; top: 0; right: 0; bottom: 0; width: 1px; background: linear-gradient(180deg, transparent, rgba(234,179,8,0.3) 30%, rgba(234,179,8,0.3) 70%, transparent); }
@@ -172,15 +206,15 @@ const Admin = () => {
         .sidebar-link { display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-radius: 10px; font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: rgba(255,255,255,0.3); text-decoration: none; transition: all 0.2s; }
         .sidebar-link:hover { color: white; background: rgba(255,255,255,0.06); }
         .sidebar-link.danger:hover { color: #f87171; background: rgba(248,113,113,0.08); }
- 
+
         /* ── MAIN ── */
         .admin-main { margin-left: var(--sidebar-w); flex: 1; padding: 40px 48px; min-height: 100vh; }
         .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 36px; }
         .page-title { font-family: 'Montserrat', sans-serif; font-size: 28px; font-weight: 900; letter-spacing: -0.02em; text-transform: uppercase; color: var(--navy); }
         .btn-add { display: flex; align-items: center; gap: 8px; background: #10B981; color: white; border: none; cursor: pointer; font-family: 'Inter', sans-serif; font-size: 11px; font-weight: 800; letter-spacing: 0.15em; text-transform: uppercase; padding: 12px 24px; border-radius: 12px; transition: all 0.2s; box-shadow: 0 4px 16px rgba(16,185,129,0.25); }
         .btn-add:hover { background: #059669; transform: translateY(-1px); box-shadow: 0 8px 24px rgba(16,185,129,0.35); }
- 
-        /* ACTION BUTTONS (For Students Table) */
+
+        /* ACTION BUTTONS */
         .action-group { display: flex; gap: 8px; justify-content: flex-end; }
         .btn-action { width: 32px; height: 32px; border-radius: 8px; border: none; display: flex; align-items: center; justify-content: center; font-size: 12px; cursor: pointer; transition: all 0.2s; }
         .btn-action.blue { background: #EFF6FF; color: #3B82F6; }
@@ -190,7 +224,7 @@ const Admin = () => {
         .btn-action.red { background: #FEE2E2; color: #EF4444; }
         .btn-action.red:hover { background: #EF4444; color: white; box-shadow: 0 4px 12px rgba(239,68,68,0.3); }
 
-        /* USER MODAL (Оқушы профилі) */
+        /* USER MODAL */
         .modal-overlay { position: fixed; inset: 0; background: rgba(16,43,69,0.6); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 999; }
         .modal-card { background: white; border-radius: 24px; padding: 40px; width: 100%; max-width: 420px; box-shadow: 0 20px 40px rgba(0,0,0,0.2); position: relative; animation: slideUp 0.3s ease; }
         @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
@@ -205,7 +239,7 @@ const Admin = () => {
         .modal-row:last-child { border-bottom: none; }
         .modal-label { color: #94A3B8; font-weight: 600; }
         .modal-value { font-weight: 800; color: var(--navy); }
- 
+
         /* Cards */
         .grade-block { background: white; border-radius: 20px; overflow: hidden; border: 1px solid rgba(16,43,69,0.07); margin-bottom: 20px; box-shadow: 0 2px 8px rgba(16,43,69,0.04); }
         .grade-block-header { background: var(--navy); padding: 16px 24px; display: flex; align-items: center; gap: 14px; }
@@ -226,7 +260,7 @@ const Admin = () => {
         .btn-delete { background: none; border: none; cursor: pointer; width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #CBD5E1; font-size: 13px; transition: all 0.2s; opacity: 0; }
         .lesson-row:hover .btn-delete { opacity: 1; }
         .btn-delete:hover { color: #EF4444; background: #FEE2E2; }
- 
+
         /* Students table */
         .table-card { background: white; border-radius: 20px; overflow: hidden; border: 1px solid rgba(16,43,69,0.07); box-shadow: 0 2px 8px rgba(16,43,69,0.04); }
         table { width: 100%; border-collapse: collapse; }
@@ -240,7 +274,7 @@ const Admin = () => {
         .td-name { font-size: 13px; font-weight: 600; color: #475569; }
         .td-city { font-size: 12px; color: #94A3B8; }
         .score-badge { display: inline-flex; align-items: center; gap: 6px; background: #FEF9C3; color: #854D0E; border: 1px solid #FDE68A; padding: 5px 12px; border-radius: 20px; font-size: 11px; font-weight: 800; }
- 
+
         /* Stats Section */
         .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
         .stat-card { background: white; border-radius: 20px; padding: 32px; display: flex; align-items: center; gap: 24px; border: 1px solid rgba(16,43,69,0.07); box-shadow: 0 4px 12px rgba(16,43,69,0.05); }
@@ -249,7 +283,7 @@ const Admin = () => {
         .stat-icon.green { background: #ECFDF5; color: #10B981; }
         .stat-info h3 { font-size: 11px; font-weight: 800; text-transform: uppercase; color: #94A3B8; letter-spacing: 0.1em; margin-bottom: 4px; }
         .stat-info p { font-family: 'Montserrat', sans-serif; font-size: 36px; font-weight: 900; color: var(--navy); line-height: 1; }
- 
+
         /* ── FORM ── */
         .form-card { background: white; border-radius: 24px; padding: 48px; max-width: 860px; border: 1px solid rgba(16,43,69,0.07); box-shadow: 0 8px 32px rgba(16,43,69,0.08); }
         .form-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 36px; padding-bottom: 28px; border-bottom: 1px solid rgba(16,43,69,0.07); }
@@ -268,7 +302,7 @@ const Admin = () => {
         .form-input:focus, .form-select:focus, .form-textarea:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(234,179,8,0.12); }
         .form-textarea { resize: vertical; min-height: 100px; line-height: 1.6; }
         .form-select:disabled { opacity: 0.5; cursor: not-allowed; }
- 
+
         /* Quiz block */
         .quiz-block { background: var(--navy); border-radius: 20px; padding: 32px; margin-bottom: 28px; }
         .quiz-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; padding-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.08); }
@@ -292,7 +326,7 @@ const Admin = () => {
         .btn-submit i { font-size: 16px; }
         .loading-text { font-family: 'Montserrat', sans-serif; font-size: 16px; font-weight: 700; color: var(--navy); opacity: 0.5; padding: 40px 0; }
       `}</style>
- 
+
       {/* ПРОФИЛЬ КӨРУ МОДАЛЬДЫ ТЕРЕЗЕСІ */}
       {viewingUser && (
         <div className="modal-overlay" onClick={() => setViewingUser(null)}>
@@ -326,7 +360,6 @@ const Admin = () => {
       )}
 
       <div className="admin-root">
- 
         {/* SIDEBAR */}
         <aside className="sidebar">
           <div className="sidebar-brand">
@@ -336,7 +369,7 @@ const Admin = () => {
               <div className="brand-sub">Басқару панелі</div>
             </div>
           </div>
- 
+
           <nav className="sidebar-nav">
             {[
               { id: 'lessons', icon: 'fa-solid fa-layer-group', label: 'Сабақтар' },
@@ -353,7 +386,7 @@ const Admin = () => {
               </button>
             ))}
           </nav>
- 
+
           <div className="sidebar-footer">
             <Link to="/" className="sidebar-link">
               <i className="fa-solid fa-arrow-left" /> Платформаға қайту
@@ -367,10 +400,9 @@ const Admin = () => {
             </button>
           </div>
         </aside>
- 
+
         {/* MAIN */}
         <main className="admin-main">
- 
           {/* STUDENTS */}
           {activeTab === 'students' && (
             <div>
@@ -428,14 +460,13 @@ const Admin = () => {
               </div>
             </div>
           )}
- 
-          {/* STATS (ЖАҢАРТЫЛҒАН НАҚТЫ ЦИФРЛАР) */}
+
+          {/* STATS */}
           {activeTab === 'stats' && (
             <div>
               <div className="page-header">
                 <h1 className="page-title">Платформа статистикасы</h1>
               </div>
-              
               <div className="stats-grid">
                 <div className="stat-card">
                   <div className="stat-icon blue"><i className="fa-solid fa-users" /></div>
@@ -452,10 +483,9 @@ const Admin = () => {
                   </div>
                 </div>
               </div>
-              
             </div>
           )}
- 
+
           {/* LESSONS LIST */}
           {activeTab === 'lessons' && !isAdding && (
             <div>
@@ -465,7 +495,7 @@ const Admin = () => {
                   <i className="fa-solid fa-plus" /> Материал жүктеу
                 </button>
               </div>
- 
+
               {loading ? (
                 <p className="loading-text">Базадан жүктелуде…</p>
               ) : (
@@ -514,14 +544,14 @@ const Admin = () => {
               )}
             </div>
           )}
- 
+
           {/* ADD FORM */}
           {activeTab === 'lessons' && isAdding && (
             <form onSubmit={handleSubmit}>
               <div className="page-header">
                 <h1 className="page-title">Сабақ құрастыру</h1>
               </div>
- 
+
               <div className="form-card">
                 <div className="form-header">
                   <div className="form-title">Жаңа сабақ</div>
@@ -529,7 +559,7 @@ const Admin = () => {
                     ✖ Болдырмау
                   </button>
                 </div>
- 
+
                 {/* Location */}
                 <div className="form-block">
                   <div className="form-block-title">
@@ -541,30 +571,85 @@ const Admin = () => {
                       <select
                         className="form-select"
                         value={selectedGrade}
-                        onChange={(e) => { setSelectedGrade(e.target.value); setSelectedTopic(''); }}
+                        onChange={(e) => { setSelectedGrade(e.target.value); setSelectedTopic(''); setIsAddingTopic(false); }}
                       >
                         <option value="">— Сыныпты таңдаңыз —</option>
                         {grades.map(g => <option key={g.id} value={g.id}>{g.id}-сынып</option>)}
                       </select>
                     </div>
+
                     <div className="form-group">
                       <label className="form-label">Қай бөлім?</label>
-                      <select
-                        className="form-select"
-                        required
-                        value={selectedTopic}
-                        onChange={(e) => setSelectedTopic(e.target.value)}
-                        disabled={!selectedGrade}
-                      >
-                        <option value="">— Бөлімді таңдаңыз —</option>
-                        {grades.find(g => g.id.toString() === selectedGrade)?.topics?.map(t => (
-                          <option key={t.id} value={t.id}>{t.title}</option>
-                        ))}
-                      </select>
+                      
+                      {/* ЖАҢА ФУНКЦИЯ: БӨЛІМ ТАҢДАУ НЕМЕСЕ ҚОСУ */}
+                      {!isAddingTopic ? (
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <select
+                            className="form-select"
+                            required={!isAddingTopic}
+                            value={selectedTopic}
+                            onChange={(e) => setSelectedTopic(e.target.value)}
+                            disabled={!selectedGrade}
+                            style={{ flex: 1 }}
+                          >
+                            <option value="">— Бөлімді таңдаңыз —</option>
+                            {grades.find(g => g.id.toString() === selectedGrade)?.topics?.map(t => (
+                              <option key={t.id} value={t.id}>{t.title}</option>
+                            ))}
+                          </select>
+                          <button
+                            type="button"
+                            disabled={!selectedGrade}
+                            onClick={() => setIsAddingTopic(true)}
+                            title={!selectedGrade ? "Алдымен сынып таңдаңыз" : "Жаңа бөлім қосу"}
+                            style={{
+                              background: selectedGrade ? '#3B82F6' : '#CBD5E1',
+                              color: 'white',
+                              border: 'none',
+                              padding: '0 16px',
+                              borderRadius: '12px',
+                              cursor: selectedGrade ? 'pointer' : 'not-allowed',
+                              fontWeight: 700,
+                              fontSize: '11px',
+                              textTransform: 'uppercase',
+                              whiteSpace: 'nowrap',
+                              transition: 'all 0.2s'
+                            }}
+                          >
+                            + Жаңа
+                          </button>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <input
+                            type="text"
+                            placeholder="Жаңа бөлім аты..."
+                            value={newTopicName}
+                            onChange={(e) => setNewTopicName(e.target.value)}
+                            className="form-input"
+                            style={{ flex: 1 }}
+                            autoFocus
+                          />
+                          <button
+                            type="button"
+                            onClick={handleCreateTopic}
+                            style={{ background: '#10B981', color: 'white', border: 'none', padding: '0 16px', borderRadius: '12px', cursor: 'pointer', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase' }}
+                          >
+                            Сақтау
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setIsAddingTopic(false)}
+                            style={{ background: '#EF4444', color: 'white', border: 'none', padding: '0 12px', borderRadius: '12px', cursor: 'pointer', fontWeight: 900 }}
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
- 
+
                 {/* Content */}
                 <div className="form-block">
                   <div className="form-block-title">
@@ -630,16 +715,15 @@ const Admin = () => {
                       />
                     </div>
                   </div>
-
                 </div>
- 
+
                 {/* Quizzes */}
                 <div className="quiz-block">
                   <div className="quiz-header">
                     <div className="quiz-title"><i className="fa-solid fa-gamepad" /> 3. Тест сұрақтары</div>
                     <span className="quiz-count">{quizzes.length} сұрақ</span>
                   </div>
- 
+
                   {quizzes.map((quiz, qIndex) => (
                     <div key={qIndex} className="quiz-item">
                       {quizzes.length > 1 && (
@@ -687,23 +771,23 @@ const Admin = () => {
                       </div>
                     </div>
                   ))}
- 
+
                   <button type="button" className="btn-add-q" onClick={addQuestion}>
                     <i className="fa-solid fa-plus" /> Тағы бір сұрақ қосу
                   </button>
                 </div>
- 
+
                 <button type="submit" className="btn-submit">
                   <i className="fa-solid fa-cloud-arrow-up" /> Платформаға жүктеу
                 </button>
               </div>
             </form>
           )}
- 
+
         </main>
       </div>
     </>
   );
 };
- 
+
 export default Admin;
