@@ -811,6 +811,10 @@ const Home = () => {
                 <a href="https://www.tiktok.com/@tilim.education?_r=1&_t=ZS-9650X5mV2gb" target="_blank" rel="noreferrer" className="social-btn" title="TikTok">
                   <i className="fa-brands fa-tiktok"></i>
                 </a>
+                {/* ЖАҢА ҚОСЫЛҒАН ТЕЛЕГРАМ СІЛТЕМЕСІ */}
+                <a href="https://t.me/+DHxCbtcNjHFjNjYy" target="_blank" rel="noreferrer" className="social-btn" title="Telegram">
+                  <i className="fa-brands fa-telegram"></i>
+                </a>
               </div>
             </div>
 
