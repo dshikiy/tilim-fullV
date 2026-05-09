@@ -396,6 +396,36 @@ func main() {
 		c.JSON(http.StatusOK, gin.H{"url": "http://localhost:8080/" + filename})
 	})
 
+	// =========================================================================
+	// ЖАҢА: АДМИНГЕ ӨЗ МОДУЛІН (БӨЛІМІН) ҚОСУҒА АРНАЛҒАН ЭНДПОИНТ
+	// =========================================================================
+	type TopicInput struct {
+		GradeID uint   `json:"grade_id"`
+		Title   string `json:"title"`
+	}
+
+	r.POST("/api/topics", func(c *gin.Context) {
+		var input TopicInput
+		if err := c.ShouldBindJSON(&input); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Мәлімет қате"})
+			return
+		}
+
+		newTopic := Topic{
+			GradeID:     input.GradeID,
+			Title:       input.Title,
+			Description: "Админ қосқан жаңа бөлім", 
+			Slug:        "custom-topic",           
+		}
+
+		if err := DB.Create(&newTopic).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Бөлім қосылмады"})
+			return
+		}
+		
+		c.JSON(http.StatusOK, newTopic)
+	})
+
 	type QuizAnswerInput struct {
 		AnswerText string `json:"answer_text"`
 		IsCorrect  bool   `json:"is_correct"`
