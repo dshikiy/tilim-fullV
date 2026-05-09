@@ -292,14 +292,13 @@ const Login = () => {
           <div className="left-content">
             <div className="left-eyebrow">
               <div className="eyebrow-line" />
-              <span className="eyebrow-text">Білім платформасы</span>
+              <span className="eyebrow-text">Білім беру платформасы</span>
             </div>
             <h1 className="left-title">
               Қазақ тілі<br /><span>ережелері</span>
             </h1>
             <p className="left-desc">
-              5–9 сынып оқушыларына арналған интерактивті
-              сабақтар, видео түсіндірмелер және тесттер.
+              5-9 сынып ережелерін қамтитын, интерактивті сабақтар, видео түсіндірмелер және тесттер.
             </p>
           </div>
           <div className="left-footer">© 2026 ТІЛІМ ПЛАТФОРМАСЫ</div>
