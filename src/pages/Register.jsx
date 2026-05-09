@@ -11,7 +11,6 @@ const Register = () => {
     if (formData.password !== formData.confirmPassword) return setError('Құпия сөздер сәйкес емес!');
     
     try {
-      // СІЛТЕМЕ ОСЫ ЖЕРДЕ ӨЗГЕРДІ 👇
       const res = await fetch('https://tilim-sqx4.onrender.com/api/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -146,7 +145,7 @@ const Register = () => {
           <div className="left-content">
             <div className="left-eyebrow">
               <div className="eyebrow-line" />
-              <span className="eyebrow-text">Білім платформасы</span>
+              <span className="eyebrow-text">Білім беру платформасы</span>
             </div>
             <h1 className="left-title">
               Бүгін<br /><span>бастаңыз</span>
@@ -176,7 +175,7 @@ const Register = () => {
                   className="form-input"
                   placeholder="email@example.com"
                   required
-                  value={formData.email} // ҚОСЫЛҒАН ЖОЛ
+                  value={formData.email}
                   onChange={e => setFormData({ ...formData, email: e.target.value })}
                 />
               </div>
@@ -188,7 +187,7 @@ const Register = () => {
                   className="form-input"
                   placeholder="Кемінде 6 таңба"
                   required
-                  value={formData.password} // ҚОСЫЛҒАН ЖОЛ
+                  value={formData.password}
                   onChange={e => setFormData({ ...formData, password: e.target.value })}
                 />
                 <div className="strength-bar">
@@ -209,7 +208,7 @@ const Register = () => {
                   className="form-input"
                   placeholder="••••••••"
                   required
-                  value={formData.confirmPassword} // ҚОСЫЛҒАН ЖОЛ
+                  value={formData.confirmPassword}
                   onChange={e => setFormData({ ...formData, confirmPassword: e.target.value })}
                   style={{
                     borderColor: formData.confirmPassword && formData.password !== formData.confirmPassword
